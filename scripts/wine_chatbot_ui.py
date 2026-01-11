@@ -249,7 +249,7 @@ def init_clients():
         return client, index
     except Exception as e:
         st.error(f"❌ Error initializing clients: {str(e)}")
-        st.info("💡 Try updating pinecone-client: pip install --upgrade pinecone-client")
+        st.info("💡 Try updating pinecone: pip install --upgrade pinecone")
         st.stop()
 
 client, index = init_clients()
