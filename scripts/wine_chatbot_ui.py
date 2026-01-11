@@ -87,7 +87,7 @@ st.markdown("""
         font-family: 'General Sans', sans-serif !important;
         font-size: 1.05rem !important;
         line-height: 1.65 !important;
-        color: #fff9f5 !important;
+        color: #2a2a2a !important;
         font-weight: 400 !important;
     }
     
@@ -101,7 +101,7 @@ st.markdown("""
     
     .stChatInput textarea {
         font-family: 'General Sans', sans-serif !important;
-        color: #fff9f5 !important;
+        color: #2a2a2a !important;
         font-size: 1rem !important;
     }
     
@@ -212,21 +212,40 @@ st.markdown("""
 @st.cache_resource
 def init_clients():
     # Get API keys - works both locally and on Streamlit Cloud
+    openai_key = None
+    pinecone_key = None
+    
     try:
         # Try Streamlit secrets first (for cloud deployment)
         openai_key = st.secrets["OPENAI_API_KEY"]
         pinecone_key = st.secrets["PINECONE_API_KEY"]
-    except:
+    except Exception as e:
         # Fallback to environment variables (for local development)
-        from dotenv import load_dotenv
-        load_dotenv()
-        openai_key = os.getenv('OPENAI_API_KEY')
-        pinecone_key = os.getenv('PINECONE_API_KEY')
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+            openai_key = os.getenv('OPENAI_API_KEY')
+            pinecone_key = os.getenv('PINECONE_API_KEY')
+        except:
+            pass
     
-    client = OpenAI(api_key=openai_key)
-    pc = Pinecone(api_key=pinecone_key)
-    index = pc.Index("wine-knowledge")
-    return client, index
+    # Validate keys
+    if not openai_key or not openai_key.startswith('sk-'):
+        st.error("❌ OpenAI API key not found or invalid. Please check your Streamlit secrets.")
+        st.stop()
+    
+    if not pinecone_key:
+        st.error("❌ Pinecone API key not found. Please check your Streamlit secrets.")
+        st.stop()
+    
+    try:
+        client = OpenAI(api_key=openai_key)
+        pc = Pinecone(api_key=pinecone_key)
+        index = pc.Index("wine-knowledge")
+        return client, index
+    except Exception as e:
+        st.error(f"❌ Error initializing clients: {str(e)}")
+        st.stop()
 
 client, index = init_clients()
 
@@ -348,7 +367,7 @@ if prompt := st.chat_input("Ask about wine..."):
     
     # Generate response
     with st.chat_message("assistant"):
-        with st.spinner("Consulting the cellar..."):
+        with st.spinner("Thinking..."):
             # Search knowledge base
             chunks = search_wine_knowledge(prompt, top_k=3)
             
