@@ -240,11 +240,16 @@ def init_clients():
     
     try:
         client = OpenAI(api_key=openai_key)
-        pc = Pinecone(api_key=pinecone_key)
+        
+        # Initialize Pinecone (v3+ API)
+        from pinecone import Pinecone as PineconeClient
+        pc = PineconeClient(api_key=pinecone_key)
         index = pc.Index("wine-knowledge")
+        
         return client, index
     except Exception as e:
         st.error(f"❌ Error initializing clients: {str(e)}")
+        st.info("💡 Try updating pinecone-client: pip install --upgrade pinecone-client")
         st.stop()
 
 client, index = init_clients()
