@@ -6,7 +6,7 @@ Run with: streamlit run wine_chatbot_modern.py
 import streamlit as st
 import os
 from openai import OpenAI
-from pinecone import Pinecone
+from pinecone import pinecone
 
 # Page config
 st.set_page_config(
