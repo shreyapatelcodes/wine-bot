@@ -87,7 +87,7 @@ st.markdown("""
         font-family: 'General Sans', sans-serif !important;
         font-size: 1.05rem !important;
         line-height: 1.65 !important;
-        color: #2a2a2a !important;
+        color: #FAF8F5 !important;
         font-weight: 400 !important;
     }
     
@@ -101,7 +101,7 @@ st.markdown("""
     
     .stChatInput textarea {
         font-family: 'General Sans', sans-serif !important;
-        color: #2a2a2a !important;
+        color: #FAF8F5 !important;
         font-size: 1rem !important;
     }
     
