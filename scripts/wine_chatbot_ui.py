@@ -6,7 +6,7 @@ Run with: streamlit run wine_chatbot_modern.py
 import streamlit as st
 import os
 from openai import OpenAI
-from pinecone import pinecone
+from pinecone import Pinecone
 
 # Page config
 st.set_page_config(
@@ -91,7 +91,7 @@ st.markdown("""
         font-weight: 400 !important;
     }
     
-    /* Chat input */
+    /* Chat input - FIXED TEXT COLOR */
     .stChatInput {
         border: 2px solid #e8dfd5 !important;
         border-radius: 24px !important;
@@ -101,12 +101,25 @@ st.markdown("""
     
     .stChatInput textarea {
         font-family: 'General Sans', sans-serif !important;
-        color: #FAF8F5 !important;
+        color: #2a2a2a !important;
         font-size: 1rem !important;
+        background: white !important;
     }
     
     .stChatInput textarea::placeholder {
         color: #a89f95 !important;
+    }
+    
+    /* Additional selectors to force text visibility */
+    .stChatInput > div {
+        background: white !important;
+    }
+    
+    .stChatInput input,
+    .stChatInput textarea,
+    [data-baseweb="textarea"] textarea {
+        color: #2a2a2a !important;
+        background: white !important;
     }
     
     /* Expander (sources) */
@@ -241,9 +254,8 @@ def init_clients():
     try:
         client = OpenAI(api_key=openai_key)
         
-        # Initialize Pinecone (v3+ API)
-        from pinecone import Pinecone as PineconeClient
-        pc = PineconeClient(api_key=pinecone_key)
+        # Initialize Pinecone (v5+ API)
+        pc = Pinecone(api_key=pinecone_key)
         index = pc.Index("wine-knowledge")
         
         return client, index
