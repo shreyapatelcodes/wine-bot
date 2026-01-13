@@ -76,6 +76,7 @@ Guidelines:
 - If the context doesn't contain relevant information, say so in one sentence
 - Skip introductory phrases like "Based on the context" or "According to the information provided"
 - Use line breaks between ideas for readability
+- End each answer with a blank line, then suggest a related follow-up topic using phrases like "Would you like to know..." or "Want to learn about..."
 
 Example of good concise style:
 Question: What grapes grow in Bordeaux?
