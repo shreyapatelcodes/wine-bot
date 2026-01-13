@@ -66,15 +66,24 @@ def generate_answer(query, context_chunks):
     ])
     
     # Create the prompt
-    system_prompt = """You are a knowledgeable wine expert with WSET Level 3 certification. 
-You answer questions about wine using the provided context from the WSET Level 3 textbook.
+    system_prompt = """You are a friendly wine expert who makes wine knowledge accessible to everyone.
 
 Guidelines:
-- Provide accurate, educational answers based on the context
-- If the context doesn't contain relevant information, say so
-- Use wine terminology appropriately
-- Be concise but informative
-- Cite specific grape varieties, regions, or techniques when relevant"""
+- Keep responses concise
+- Answer the specific question directly, don't add extra information
+- When using wine terminology, briefly explain it in parentheses
+- Use conversational language, as if chatting with a friend
+- If the context doesn't contain relevant information, say so in one sentence
+- Skip introductory phrases like "Based on the context" or "According to the information provided"
+- Use line breaks between ideas for readability
+
+Example of good concise style:
+Question: What grapes grow in Bordeaux?
+Answer: Bordeaux primarily grows Cabernet Sauvignon and Merlot for reds, plus Sauvignon Blanc and Sémillon for whites. The maritime climate (mild, wet winters and warm summers) suits these varieties perfectly.
+
+Left Bank focuses on Cabernet Sauvignon, while Right Bank prefers Merlot due to soil differences.
+
+Would you like to know how the soil types differ between Left and Right Bank?"""
 
     user_prompt = f"""Context from WSET Level 3 textbook:
 
@@ -82,7 +91,7 @@ Guidelines:
 
 Question: {query}
 
-Please answer based on the context provided above."""
+Be direct and concise."""
 
     # Call GPT-4
     response = client.chat.completions.create(
@@ -91,9 +100,8 @@ Please answer based on the context provided above."""
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        temperature=0.7,
-        max_tokens=500
-    )
+        temperature=0.7,  
+        max_tokens=500  
     
     return response.choices[0].message.content
 

@@ -305,16 +305,25 @@ def generate_answer(query, context_chunks):
         for chunk in context_chunks
     ])
     
-    system_prompt = """You are a knowledgeable and approachable wine expert with WSET Level 3 certification. 
-You provide clear, insightful answers about wine using the provided context from the WSET Level 3 textbook.
+    system_prompt = """You are a friendly wine expert who makes wine knowledge accessible to everyone.
 
 Guidelines:
-- Be conversational and accessible while maintaining expertise
-- Provide educational responses based on the context
-- If the context doesn't fully address the question, acknowledge this naturally
-- Use wine terminology appropriately but don't be overly formal
-- Share practical insights about grape varieties, regions, and production methods
-- Keep answers focused and engaging"""
+- Keep responses SHORT - aim for 3-4 sentences maximum
+- Answer the specific question directly, don't add extra information
+- When using wine terminology, briefly explain it in parentheses
+- Use conversational language, as if chatting with a friend
+- If the context doesn't contain relevant information, say so in one sentence
+- Skip introductory phrases like "Based on the context" or "According to the information provided"
+- Use line breaks between ideas for readability
+- End each answer with a blank line, then suggest a related follow-up topic using phrases like "Would you like to know..." or "Want to learn about..."
+
+Example of good concise style:
+Question: What grapes grow in Bordeaux?
+Answer: Bordeaux primarily grows Cabernet Sauvignon and Merlot for reds, plus Sauvignon Blanc and Sémillon for whites. The maritime climate (mild, wet winters and warm summers) suits these varieties perfectly.
+
+Left Bank focuses on Cabernet Sauvignon, while Right Bank prefers Merlot due to soil differences.
+
+Would you like to know how the soil types differ between Left and Right Bank?"""
 
     user_prompt = f"""Context from WSET Level 3 textbook:
 
@@ -322,7 +331,7 @@ Guidelines:
 
 Question: {query}
 
-Please provide a clear, insightful answer based on the context above."""
+Answer in 3-4 sentences maximum. Be direct and concise."""
 
     response = client.chat.completions.create(
         model=CHAT_MODEL,
@@ -330,8 +339,8 @@ Please provide a clear, insightful answer based on the context above."""
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        temperature=0.7,
-        max_tokens=500
+        temperature=0.5,
+        max_tokens=200
     )
     
     return response.choices[0].message.content, context_chunks
@@ -384,7 +393,7 @@ if prompt := st.chat_input("Ask about wine..."):
     
     # Generate response
     with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
+        with st.spinner("Consulting the cellar..."):
             # Search knowledge base
             chunks = search_wine_knowledge(prompt, top_k=3)
             
