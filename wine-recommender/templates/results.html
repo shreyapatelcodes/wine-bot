@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Your Recommendations | AI Wine Agent</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500&family=Courier+Prime&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#721c24",
+                        secondary: "#d4af37",
+                        "background-light": "#f9f5eb",
+                        "background-dark": "#1a1614",
+                    },
+                    fontFamily: {
+                        display: ["Playfair Display", "serif"],
+                        sans: ["Inter", "sans-serif"],
+                        mono: ["Courier Prime", "monospace"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "4px",
+                    },
+                },
+            },
+        };
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body class="bg-background-light dark:bg-background-dark text-primary dark:text-background-light transition-colors duration-300 min-h-screen flex flex-col font-sans selection:bg-primary selection:text-white">
+    <div class="vintage-overlay fixed inset-0 z-50"></div>
+
+    <header class="w-full px-8 py-6 flex justify-between items-center border-b border-primary/10 dark:border-background-light/10">
+        <div class="flex items-center space-x-2">
+            <span class="text-3xl font-display font-bold tracking-tighter">V</span>
+            <div class="h-8 w-[1px] bg-primary/20 dark:bg-background-light/20 mx-4"></div>
+            <span class="text-xs uppercase tracking-[0.3em] font-medium">AI Wine Agent</span>
+        </div>
+        <nav class="hidden md:flex space-x-12">
+            <a class="text-xs uppercase tracking-[0.2em] hover:opacity-60 transition-opacity font-bold border-b-2 border-primary" href="/">Home</a>
+        </nav>
+        <div class="flex items-center space-x-6">
+            <button id="darkModeToggle" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                <span class="material-icons text-xl">dark_mode</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-grow px-6 py-12">
+        <!-- Wine Recommendations -->
+        <div id="recommendations" class="max-w-6xl mx-auto space-y-8">
+            <!-- Recommendations will be rendered here by JavaScript -->
+        </div>
+
+        <!-- Back to Search Button -->
+        <div class="max-w-4xl mx-auto mt-16 text-center">
+            <a href="/" class="inline-flex items-center space-x-3 bg-primary text-white dark:bg-background-light dark:text-background-dark px-12 py-4 rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:scale-105 transition-transform shadow-xl">
+                <span class="material-icons text-sm">arrow_back</span>
+                <span>New Search</span>
+            </a>
+        </div>
+    </main>
+
+    <footer class="w-full border-t border-primary/10 dark:border-background-light/10 px-8 py-8 mt-16">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-12 max-w-7xl mx-auto">
+            </div>
+            <div class="col-span-1 md:col-span-3"></div>
+        </div>
+        <div class="mt-16 flex flex-col md:flex-row justify-between items-center text-[9px] uppercase tracking-[0.2em] opacity-40">
+            <p>© 2024 AI Wine Agent. All Rights Reserved.</p>
+            <div class="flex space-x-6 mt-4 md:mt-0">
+                <a class="hover:opacity-100 transition-opacity" href="#">Privacy Policy</a>
+                <a class="hover:opacity-100 transition-opacity" href="#">Terms of Service</a>
+                <a class="hover:opacity-100 transition-opacity" href="#">Responsible Drinking</a>
+            </div>
+        </div>
+    </footer>
+
+    <div class="fixed bottom-0 left-0 w-24 h-24 bg-primary/5 rounded-tr-full -z-10"></div>
+    <div class="fixed top-0 right-0 w-48 h-48 bg-primary/5 rounded-bl-full -z-10 blur-3xl"></div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        // Render recommendations on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Restore dark mode preference
+            if (localStorage.getItem('darkMode') === 'true') {
+                document.documentElement.classList.add('dark');
+            }
+
+            // Get recommendations from sessionStorage
+            const recommendationsData = sessionStorage.getItem('recommendations');
+            if (recommendationsData) {
+                const data = JSON.parse(recommendationsData);
+                renderRecommendations(data.recommendations);
+            } else {
+                // Redirect to home if no recommendations found
+                window.location.href = '/';
+            }
+
+            // Dark mode toggle
+            document.getElementById('darkModeToggle')?.addEventListener('click', () => {
+                document.documentElement.classList.toggle('dark');
+                localStorage.setItem('darkMode',
+                    document.documentElement.classList.contains('dark')
+                );
+            });
+        });
+
+        function renderRecommendations(recommendations) {
+            const container = document.getElementById('recommendations');
+
+            recommendations.forEach((rec, index) => {
+                const wine = rec.wine;
+                const charTags = wine.characteristics.slice(0, 3).map(char =>
+                    `<span class="char-tag inline-block px-4 py-2 rounded-full text-xs bg-primary/5 dark:bg-white/5 border border-primary/10 dark:border-background-light/10 mr-2 mb-2">${char}</span>`
+                ).join('');
+
+                const wineCard = `
+                    <div class="wine-card bg-white/60 dark:bg-black/30 backdrop-blur-sm border border-primary/10 dark:border-background-light/10 rounded-lg p-8 md:p-12 shadow-xl hover:shadow-2xl transition-shadow">
+                        <div class="text-[10px] uppercase tracking-widest opacity-30 mb-2 font-mono">0${index + 1}</div>
+
+                        <h2 class="font-display text-4xl md:text-5xl text-primary dark:text-background-light mb-2">${wine.name}</h2>
+
+                        <p class="font-sans italic text-lg opacity-70 mb-1">${wine.varietal}</p>
+                        <p class="font-sans italic text-lg opacity-70 mb-6">${wine.region}, ${wine.country}</p>
+
+                        <p class="font-mono text-3xl font-bold mb-8">$${wine.price_usd.toFixed(2)}</p>
+
+                        <div class="bg-primary/5 dark:bg-white/5 border-l-4 border-primary dark:border-background-light p-6 rounded mb-8">
+                            <div class="text-[10px] uppercase tracking-widest opacity-50 mb-3 font-bold">Why We Chose This</div>
+                            <p class="font-sans italic text-lg leading-relaxed">"${rec.explanation}"</p>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-6 mb-8">
+                            <div>
+                                <span class="text-[10px] uppercase tracking-widest opacity-50 font-bold">Varietal</span>
+                                <p class="font-mono text-sm mt-1">${wine.varietal}</p>
+                            </div>
+                            <div>
+                                <span class="text-[10px] uppercase tracking-widest opacity-50 font-bold">Region</span>
+                                <p class="font-mono text-sm mt-1">${wine.region}</p>
+                            </div>
+                        </div>
+
+                        <div class="mb-8">
+                            <div class="text-[10px] uppercase tracking-widest opacity-50 mb-3 font-bold">Characteristics</div>
+                            <div class="flex flex-wrap">
+                                ${charTags}
+                            </div>
+                        </div>
+
+                        <div class="mb-8">
+                            <div class="text-[10px] uppercase tracking-widest opacity-50 mb-3 font-bold">Flavor Notes</div>
+                            <p class="font-sans italic text-base leading-relaxed">${wine.flavor_notes.join(', ')}</p>
+                        </div>
+
+                        <div class="flex justify-center mt-8">
+                            <a href="${wine.vivino_url}" target="_blank" class="inline-flex items-center space-x-3 bg-primary text-white dark:bg-background-light dark:text-background-dark px-8 py-3 rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:scale-105 transition-transform shadow-lg">
+                                <span>View on Vivino</span>
+                                <span class="material-icons text-sm">arrow_forward</span>
+                            </a>
+                        </div>
+                    </div>
+                `;
+
+                container.innerHTML += wineCard;
+            });
+        }
+    </script>
+</body>
+</html>

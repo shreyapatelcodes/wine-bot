@@ -93,15 +93,15 @@ class WineSearcher:
         """Convert Pinecone match to Wine object."""
         metadata = match['metadata']
 
-        # Parse JSON strings back to lists
-        characteristics = json.loads(metadata['characteristics'])
-        flavor_notes = json.loads(metadata['flavor_notes'])
+        # Parse comma-separated strings back to lists
+        characteristics = [c.strip() for c in metadata['characteristics'].split(',')] if metadata.get('characteristics') else []
+        flavor_notes = [f.strip() for f in metadata['flavor_notes'].split(',')] if metadata.get('flavor_notes') else []
 
         wine = Wine(
             id=match['id'],
             name=metadata['name'],
             producer=metadata['producer'],
-            vintage=metadata['vintage'] if metadata['vintage'] > 0 else None,
+            vintage=metadata.get('vintage') if metadata.get('vintage', 0) > 0 else None,
             wine_type=metadata['wine_type'],
             varietal=metadata['varietal'],
             country=metadata['country'],
@@ -112,10 +112,10 @@ class WineSearcher:
             tannin=metadata['tannin'] if metadata['tannin'] != "n/a" else None,
             characteristics=characteristics,
             flavor_notes=flavor_notes,
-            description=metadata['description'],
-            price_usd=metadata['price_usd'],
-            rating=metadata['rating'] if metadata['rating'] > 0 else None,
-            wine_com_url=metadata['wine_com_url']
+            description=metadata.get('description', ''),
+            price_usd=metadata.get('price_usd'),
+            rating=metadata.get('rating') if metadata.get('rating', 0) > 0 else None,
+            vivino_url=metadata['vivino_url']
         )
 
         return wine

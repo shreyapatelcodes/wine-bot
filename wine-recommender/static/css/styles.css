@@ -1,0 +1,194 @@
+/* Custom Tailwind CSS Styles for AI Wine Agent */
+
+.custom-border {
+    border-bottom: 1px solid rgba(114, 28, 36, 0.2);
+}
+
+.dark .custom-border {
+    border-bottom: 1px solid rgba(249, 245, 235, 0.1);
+}
+
+.vertical-text {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+}
+
+.vintage-overlay {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuDEjMzda_vRBwn4JyS9FDhax7mw_IkTMz8T1EONhM8e_ykp04ISHghMga5jwLeVr0kDLDAvJy8HpQYzOhhChaexaLo8qcazGs9BQSxo1crQStX-0LMk78u6gSBFF5rX8zycbfczOCT_Np3GCOApoyi3k6gcS53MG7qQkAWSrF_vh8_9zweJTWOAZ32HWy7ZZsLpqunKE-J9wgEeQmw0kkKcP4yNihzsdx0Uq8E_oot1nWdoytsktom9e-cE9pBtpyo0G4bXqant9CA-);
+    opacity: 0.05;
+    pointer-events: none;
+}
+
+.material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+}
+
+.price-input-minimal {
+    background: transparent;
+    border: none;
+    padding: 0;
+    text-align: center;
+    appearance: none;
+    -moz-appearance: textfield;
+}
+
+.price-input-minimal:focus {
+    outline: none;
+    ring: 0;
+}
+
+.price-input-minimal::placeholder {
+    opacity: 0.3;
+}
+
+/* Remove spinner buttons from number inputs */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+input[type=number] {
+    -moz-appearance: textfield;
+}
+
+/* Loading animation */
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-20px);
+    }
+}
+
+.animate-bounce {
+    animation: float 3s ease-in-out infinite;
+}
+
+/* Wine card hover effects */
+.wine-card {
+    transition: all 0.3s ease;
+}
+
+.wine-card:hover {
+    transform: translateY(-4px);
+}
+
+/* Category chip active state */
+.category-chip.active {
+    background: rgba(114, 28, 36, 0.1);
+    border-color: #721c24;
+    opacity: 1;
+}
+
+.dark .category-chip.active {
+    background: rgba(249, 245, 235, 0.1);
+    border-color: #f9f5eb;
+}
+
+/* Smooth transitions */
+* {
+    transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+}
+
+/* Focus states */
+button:focus,
+a:focus {
+    outline: 2px solid rgba(114, 28, 36, 0.5);
+    outline-offset: 2px;
+}
+
+.dark button:focus,
+.dark a:focus {
+    outline-color: rgba(249, 245, 235, 0.5);
+}
+
+/* Selection styling */
+::selection {
+    background-color: #721c24;
+    color: white;
+}
+
+.dark ::selection {
+    background-color: #f9f5eb;
+    color: #1a1614;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(114, 28, 36, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(114, 28, 36, 0.3);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(114, 28, 36, 0.5);
+}
+
+.dark ::-webkit-scrollbar-track {
+    background: rgba(249, 245, 235, 0.05);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: rgba(249, 245, 235, 0.3);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(249, 245, 235, 0.5);
+}
+
+/* Loading overlay */
+#loadingOverlay {
+    z-index: 9999;
+}
+
+/* Error message animation */
+#errorMessage {
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive typography */
+@media (max-width: 768px) {
+    .font-display {
+        font-size: 2.5rem !important;
+    }
+}
+
+/* Print styles */
+@media print {
+    .vintage-overlay,
+    header nav,
+    footer,
+    #darkModeToggle,
+    #loadingOverlay {
+        display: none !important;
+    }
+
+    .wine-card {
+        page-break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #ccc;
+    }
+}

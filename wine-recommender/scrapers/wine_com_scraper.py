@@ -217,6 +217,10 @@ class WineComScraper:
             # Parse country and region from origin
             country, region = self._parse_origin(origin)
 
+            # Generate Vivino search URL from wine name
+            vivino_search_query = name.replace(" ", "+").replace("'", "")
+            vivino_url = f"https://www.vivino.com/en/search/wines?q={vivino_search_query}"
+
             return {
                 "name": name,
                 "producer": producer,
@@ -226,7 +230,8 @@ class WineComScraper:
                 "region": region,
                 "price_usd": price,
                 "rating": rating,
-                "wine_com_url": wine_url
+                "wine_com_url": wine_url,
+                "vivino_url": vivino_url
             }
 
         except Exception as e:

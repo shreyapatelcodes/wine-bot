@@ -90,7 +90,7 @@ class Wine(BaseModel):
     description: str = Field(..., description="Full wine description for embeddings")
     price_usd: float = Field(..., description="Price in USD")
     rating: Optional[float] = Field(None, description="Rating out of 5")
-    wine_com_url: str = Field(..., description="Wine.com purchase URL")
+    vivino_url: str = Field(..., description="Vivino search URL")
 
     class Config:
         json_schema_extra = {
@@ -112,7 +112,7 @@ class Wine(BaseModel):
                 "description": "Full-bodied Cabernet Sauvignon from Paso Robles with high tannins and bold structure...",
                 "price_usd": 42.00,
                 "rating": 4.3,
-                "wine_com_url": "https://www.wine.com/product/justin-cabernet-sauvignon-2020/12345"
+                "vivino_url": "https://www.vivino.com/en/search/wines?q=Justin+Cabernet+Sauvignon+2020"
             }
         }
 

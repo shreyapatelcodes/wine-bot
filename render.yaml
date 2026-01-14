@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: wine-recommender
+    env: python
+    region: oregon # Choose region closest to your users (oregon, frankfurt, singapore, ohio)
+    plan: free # Change to 'starter' for production ($7/month)
+    branch: main
+    rootDir: wine-recommender
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 2 --timeout 60 app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.16
+      - key: FLASK_DEBUG
+        value: False
+      - key: OPENAI_API_KEY
+        sync: false # You'll set this in Render dashboard
+      - key: PINECONE_API_KEY
+        sync: false # You'll set this in Render dashboard
+      - key: SECRET_KEY
+        generateValue: true # Render will auto-generate a secure secret
+    healthCheckPath: /health
