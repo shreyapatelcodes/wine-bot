@@ -101,9 +101,10 @@ Be direct and concise."""
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        temperature=0.7,  
-        max_tokens=500  
-    
+        temperature=0.7,
+        max_tokens=500
+    )
+
     return response.choices[0].message.content
 
 def chat(query, verbose=False):
