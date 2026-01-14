@@ -5,7 +5,7 @@ This chatbot retrieves relevant wine knowledge and generates expert answers
 
 import os
 from openai import OpenAI
-from pinecone import pinecone
+from pinecone import Pinecone
 from dotenv import load_dotenv
 
 # Load environment variables
