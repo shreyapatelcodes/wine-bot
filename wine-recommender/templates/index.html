@@ -35,33 +35,28 @@
     </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
-<body class="bg-background-light dark:bg-background-dark text-primary dark:text-background-light transition-colors duration-300 min-h-screen flex flex-col font-sans selection:bg-primary selection:text-white">
+<body class="bg-background-light text-primary min-h-screen flex flex-col font-sans selection:bg-primary selection:text-white">
     <div class="vintage-overlay fixed inset-0 z-50"></div>
 
-    <header class="w-full px-8 py-6 flex justify-between items-center border-b border-primary/10 dark:border-background-light/10">
+    <header class="w-full px-8 py-6 flex justify-between items-center border-b border-primary/10">
         <div class="flex items-center space-x-2">
             <span class="text-3xl font-display font-bold tracking-tighter">V</span>
-            <div class="h-8 w-[1px] bg-primary/20 dark:bg-background-light/20 mx-4"></div>
+            <div class="h-8 w-[1px] bg-primary/20 mx-4"></div>
             <span class="text-xs uppercase tracking-[0.3em] font-medium">AI Wine Agent</span>
         </div>
         <nav class="hidden md:flex space-x-12">
             <a class="text-xs uppercase tracking-[0.2em] hover:opacity-60 transition-opacity font-bold border-b-2 border-primary" href="/">Home</a>
         </nav>
-        <div class="flex items-center space-x-6">
-            <button id="darkModeToggle" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                <span class="material-icons text-xl">dark_mode</span>
-            </button>
-        </div>
     </header>
 
     <main class="flex-grow flex flex-col items-center justify-center px-6 relative overflow-hidden">
-        <div class="hidden lg:flex flex-col absolute left-8 top-1/2 -translate-y-1/2 space-y-12 text-[10px] uppercase tracking-[0.4em] text-primary/40 dark:text-background-light/40">
+        <div class="hidden lg:flex flex-col absolute left-8 top-1/2 -translate-y-1/2 space-y-12 text-[10px] uppercase tracking-[0.4em] text-primary/40">
             <span class="vertical-text transform rotate-180">Curated Selections</span>
             <span class="vertical-text transform rotate-180">Global Cellar</span>
             <span class="vertical-text transform rotate-180">Sommelier AI</span>
         </div>
 
-        <div class="hidden lg:flex flex-col absolute right-8 top-1/2 -translate-y-1/2 border-l border-primary/20 dark:border-background-light/20 pl-4 space-y-8">
+        <div class="hidden lg:flex flex-col absolute right-8 top-1/2 -translate-y-1/2 border-l border-primary/20 pl-4 space-y-8">
             <div class="flex flex-col">
                 <span class="text-[10px] uppercase tracking-widest opacity-50 mb-1">Status</span>
                 <span class="text-xs font-mono">CELLAR OPEN</span>
@@ -74,7 +69,7 @@
 
         <div class="max-w-4xl w-full text-center space-y-12">
             <div class="space-y-4">
-                <h1 class="font-display italic text-5xl md:text-7xl lg:text-8xl text-primary dark:text-background-light">
+                <h1 class="font-display italic text-5xl md:text-7xl lg:text-8xl text-primary">
                     The Perfect Pour.
                 </h1>
                 <p class="font-mono text-sm md:text-base opacity-70 max-w-2xl mx-auto leading-relaxed uppercase tracking-wider">
@@ -83,16 +78,16 @@
             </div>
 
             <div class="relative group">
-                <div class="absolute -inset-1 bg-primary/5 dark:bg-white/5 rounded-lg blur opacity-25 group-focus-within:opacity-100 transition duration-1000 group-focus-within:duration-200"></div>
-                <div class="relative bg-white/40 dark:bg-black/20 backdrop-blur-sm border border-primary/20 dark:border-background-light/20 p-4 md:p-8 rounded-lg shadow-2xl">
+                <div class="absolute -inset-1 bg-primary/5 rounded-lg blur opacity-25 group-focus-within:opacity-100 transition duration-1000 group-focus-within:duration-200"></div>
+                <div class="relative bg-white/40 backdrop-blur-sm border border-primary/20 p-4 md:p-8 rounded-lg shadow-2xl">
                     <form id="wineForm">
-                        <textarea id="wineDescription" class="w-full bg-transparent border-none focus:ring-0 text-xl md:text-2xl font-display placeholder:text-primary/20 dark:placeholder:text-background-light/20 resize-none text-center italic" placeholder=""I want a bold red under $50 for a steak dinner tonight..."" rows="4"></textarea>
+                        <textarea id="wineDescription" class="w-full bg-transparent border-none focus:ring-0 text-xl md:text-2xl font-display placeholder:text-primary/20 resize-none text-center italic" placeholder=""I want a bold red under $50 for a steak dinner tonight..."" rows="4"></textarea>
 
-                        <div class="mt-8 flex flex-col md:flex-row items-center justify-between gap-6 border-t border-primary/10 dark:border-background-light/10 pt-6">
+                        <div class="mt-8 flex flex-col md:flex-row items-center justify-between gap-6 border-t border-primary/10 pt-6">
                             <div class="flex items-center space-x-6">
-                                <div class="flex items-center space-x-3 px-4 border-l border-primary/10 dark:border-background-light/10 h-8">
+                                <div class="flex items-center space-x-3 px-4 border-l border-primary/10 h-8">
                                     <span class="text-[9px] uppercase tracking-widest opacity-40 font-bold">Price Range</span>
-                                    <div class="flex items-center bg-primary/5 dark:bg-background-light/5 px-2 py-1 rounded-sm border border-primary/10 dark:border-background-light/10">
+                                    <div class="flex items-center bg-primary/5 px-2 py-1 rounded-sm border border-primary/10">
                                         <span class="text-[9px] font-mono opacity-50">$</span>
                                         <input id="minPrice" class="price-input-minimal" placeholder="10" type="number" value="10" min="5" max="500"/>
                                         <span class="mx-1 opacity-20 font-mono text-[9px]">—</span>
@@ -102,7 +97,7 @@
                                 </div>
                             </div>
 
-                            <button type="submit" class="bg-primary text-white dark:bg-background-light dark:text-background-dark px-12 py-4 rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:scale-105 transition-transform shadow-xl flex items-center space-x-3">
+                            <button type="submit" class="bg-primary text-white px-12 py-4 rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:scale-105 transition-transform shadow-xl flex items-center space-x-3">
                                 <span>Consult Agent</span>
                                 <span class="material-icons text-sm">arrow_forward</span>
                             </button>
@@ -110,7 +105,7 @@
                     </form>
 
                     <!-- Error message container -->
-                    <div id="errorMessage" class="mt-4 p-4 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 rounded-lg hidden">
+                    <div id="errorMessage" class="mt-4 p-4 bg-red-100 text-red-800 rounded-lg hidden">
                         <p class="text-sm font-mono"></p>
                     </div>
                 </div>
@@ -118,7 +113,7 @@
         </div>
     </main>
 
-    <footer class="w-full border-t border-primary/10 dark:border-background-light/10 px-8 py-8">
+    <footer class="w-full border-t border-primary/10 px-8 py-8">
         
         <div class="mt-16 flex flex-col md:flex-row justify-between items-center text-[9px] uppercase tracking-[0.2em] opacity-40">
             <p> 2025 AI Wine Agent</p>
@@ -129,11 +124,11 @@
     <div class="fixed top-0 right-0 w-48 h-48 bg-primary/5 rounded-bl-full -z-10 blur-3xl"></div>
 
     <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="fixed inset-0 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md z-[100] hidden flex items-center justify-center">
+    <div id="loadingOverlay" class="fixed inset-0 bg-background-light/95 backdrop-blur-md z-[100] hidden flex items-center justify-center">
         <div class="text-center space-y-8">
             <div class="text-7xl animate-bounce">🍷</div>
-            <div class="font-display italic text-4xl text-primary dark:text-background-light">AI Sommelier</div>
-            <div id="loadingMessage" class="font-mono text-lg text-primary/70 dark:text-background-light/70 italic">Curating your collection...</div>
+            <div class="font-display italic text-4xl text-primary">AI Sommelier</div>
+            <div id="loadingMessage" class="font-mono text-lg text-primary/70 italic">Curating your collection...</div>
         </div>
     </div>
 

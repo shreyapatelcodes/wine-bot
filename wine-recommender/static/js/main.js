@@ -19,31 +19,9 @@ let loadingInterval = null;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
-    initializeDarkMode();
     initializeForm();
     initializeCategoryChips();
-    initializeDarkModeToggle();
 });
-
-// Dark mode initialization
-function initializeDarkMode() {
-    if (localStorage.getItem('darkMode') === 'true') {
-        document.documentElement.classList.add('dark');
-    }
-}
-
-// Dark mode toggle
-function initializeDarkModeToggle() {
-    const toggle = document.getElementById('darkModeToggle');
-    if (toggle) {
-        toggle.addEventListener('click', () => {
-            document.documentElement.classList.toggle('dark');
-            localStorage.setItem('darkMode',
-                document.documentElement.classList.contains('dark')
-            );
-        });
-    }
-}
 
 // Form initialization
 function initializeForm() {
@@ -215,22 +193,22 @@ function renderRecommendations(recommendations) {
 
         // Build characteristics tags
         const charTags = wine.characteristics.slice(0, 3).map(char =>
-            `<span class="char-tag inline-block px-4 py-2 rounded-full text-xs bg-primary/5 dark:bg-white/5 border border-primary/10 dark:border-background-light/10 mr-2 mb-2">${char}</span>`
+            `<span class="char-tag inline-block px-4 py-2 rounded-full text-xs bg-primary/5 border border-primary/10 mr-2 mb-2">${char}</span>`
         ).join('');
 
         // Build wine card HTML
         const wineCard = `
-            <div class="wine-card bg-white/60 dark:bg-black/30 backdrop-blur-sm border border-primary/10 dark:border-background-light/10 rounded-lg p-8 md:p-12 shadow-xl hover:shadow-2xl transition-shadow">
+            <div class="wine-card bg-white/60 backdrop-blur-sm border border-primary/10 rounded-lg p-8 md:p-12 shadow-xl hover:shadow-2xl transition-shadow">
                 <div class="text-[10px] uppercase tracking-widest opacity-30 mb-2 font-mono">0${index + 1}</div>
 
-                <h2 class="font-display text-4xl md:text-5xl text-primary dark:text-background-light mb-2">${wine.name}</h2>
+                <h2 class="font-display text-4xl md:text-5xl text-primary mb-2">${wine.name}</h2>
 
                 <p class="font-sans italic text-lg opacity-70 mb-1">${wine.varietal}</p>
                 <p class="font-sans italic text-lg opacity-70 mb-6">${wine.region}, ${wine.country}</p>
 
                 <p class="font-mono text-3xl font-bold mb-8">$${wine.price_usd.toFixed(2)}</p>
 
-                <div class="bg-primary/5 dark:bg-white/5 border-l-4 border-primary dark:border-background-light p-6 rounded mb-8">
+                <div class="bg-primary/5 border-l-4 border-primary p-6 rounded mb-8">
                     <div class="text-[10px] uppercase tracking-widest opacity-50 mb-3 font-bold">Why We Chose This</div>
                     <p class="font-sans italic text-lg leading-relaxed">"${rec.explanation}"</p>
                 </div>
@@ -259,9 +237,9 @@ function renderRecommendations(recommendations) {
                 </div>
 
                 <div class="flex justify-center mt-8">
-                    <a href="${wine.vivino_url}" target="_blank" class="inline-flex items-center space-x-3 bg-primary text-white dark:bg-background-light dark:text-background-dark px-8 py-3 rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:scale-105 transition-transform shadow-lg">
-                        <span>View on Vivino</span>
-                        <span class="material-icons text-sm">arrow_forward</span>
+                    <a href="${wine.vivino_url}" target="_blank" class="inline-flex items-center space-x-2 bg-primary text-white px-6 py-3 rounded-full font-bold uppercase tracking-[0.15em] text-xs hover:scale-105 transition-transform shadow-lg">
+                        <span>Buy Now</span>
+                        <span class="material-icons text-sm">shopping_cart</span>
                     </a>
                 </div>
             </div>

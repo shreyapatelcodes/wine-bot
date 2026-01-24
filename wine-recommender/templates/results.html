@@ -34,26 +34,38 @@
     </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
-<body class="bg-background-light dark:bg-background-dark text-primary dark:text-background-light transition-colors duration-300 min-h-screen flex flex-col font-sans selection:bg-primary selection:text-white">
+<body class="bg-background-light text-primary min-h-screen flex flex-col font-sans selection:bg-primary selection:text-white">
     <div class="vintage-overlay fixed inset-0 z-50"></div>
 
-    <header class="w-full px-8 py-6 flex justify-between items-center border-b border-primary/10 dark:border-background-light/10">
+    <header class="w-full px-8 py-6 flex justify-between items-center border-b border-primary/10">
         <div class="flex items-center space-x-2">
             <span class="text-3xl font-display font-bold tracking-tighter">V</span>
-            <div class="h-8 w-[1px] bg-primary/20 dark:bg-background-light/20 mx-4"></div>
+            <div class="h-8 w-[1px] bg-primary/20 mx-4"></div>
             <span class="text-xs uppercase tracking-[0.3em] font-medium">AI Wine Agent</span>
         </div>
         <nav class="hidden md:flex space-x-12">
             <a class="text-xs uppercase tracking-[0.2em] hover:opacity-60 transition-opacity font-bold border-b-2 border-primary" href="/">Home</a>
         </nav>
-        <div class="flex items-center space-x-6">
-            <button id="darkModeToggle" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
-                <span class="material-icons text-xl">dark_mode</span>
-            </button>
-        </div>
     </header>
 
-    <main class="flex-grow px-6 py-12">
+    <main class="flex-grow px-6 py-12 relative">
+        <div class="hidden lg:flex flex-col fixed left-8 top-1/2 -translate-y-1/2 space-y-12 text-[10px] uppercase tracking-[0.4em] text-primary/40">
+            <span class="vertical-text transform rotate-180">Curated Selections</span>
+            <span class="vertical-text transform rotate-180">Global Cellar</span>
+            <span class="vertical-text transform rotate-180">Sommelier AI</span>
+        </div>
+
+        <div class="hidden lg:flex flex-col fixed right-8 top-1/2 -translate-y-1/2 border-l border-primary/20 pl-4 space-y-8">
+            <div class="flex flex-col">
+                <span class="text-[10px] uppercase tracking-widest opacity-50 mb-1">Status</span>
+                <span class="text-xs font-mono">CELLAR OPEN</span>
+            </div>
+            <div class="flex flex-col">
+                <span class="text-[10px] uppercase tracking-widest opacity-50 mb-1">Temp</span>
+                <span class="text-xs font-mono">13°C / 55°F</span>
+            </div>
+        </div>
+
         <!-- Wine Recommendations -->
         <div id="recommendations" class="max-w-6xl mx-auto space-y-8">
             <!-- Recommendations will be rendered here by JavaScript -->
@@ -61,14 +73,14 @@
 
         <!-- Back to Search Button -->
         <div class="max-w-4xl mx-auto mt-16 text-center">
-            <a href="/" class="inline-flex items-center space-x-3 bg-primary text-white dark:bg-background-light dark:text-background-dark px-12 py-4 rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:scale-105 transition-transform shadow-xl">
+            <a href="/" class="inline-flex items-center space-x-3 bg-primary text-white px-12 py-4 rounded-full font-bold uppercase tracking-[0.2em] text-xs hover:scale-105 transition-transform shadow-xl">
                 <span class="material-icons text-sm">arrow_back</span>
                 <span>New Search</span>
             </a>
         </div>
     </main>
 
-    <footer class="w-full border-t border-primary/10 dark:border-background-light/10 px-8 py-8 mt-16">
+    <footer class="w-full border-t border-primary/10 px-8 py-8 mt-16">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-12 max-w-7xl mx-auto">
             </div>
             <div class="col-span-1 md:col-span-3"></div>
@@ -85,11 +97,6 @@
     <script>
         // Render recommendations on page load
         document.addEventListener('DOMContentLoaded', () => {
-            // Restore dark mode preference
-            if (localStorage.getItem('darkMode') === 'true') {
-                document.documentElement.classList.add('dark');
-            }
-
             // Get recommendations from sessionStorage
             const recommendationsData = sessionStorage.getItem('recommendations');
             if (recommendationsData) {
@@ -99,14 +106,6 @@
                 // Redirect to home if no recommendations found
                 window.location.href = '/';
             }
-
-            // Dark mode toggle
-            document.getElementById('darkModeToggle')?.addEventListener('click', () => {
-                document.documentElement.classList.toggle('dark');
-                localStorage.setItem('darkMode',
-                    document.documentElement.classList.contains('dark')
-                );
-            });
         });
 
         function renderRecommendations(recommendations) {
@@ -115,17 +114,17 @@
             recommendations.forEach((rec, index) => {
                 const wine = rec.wine;
                 const charTags = wine.characteristics.slice(0, 3).map(char =>
-                    `<span class="char-tag inline-block px-4 py-2 rounded-full text-xs bg-primary/5 dark:bg-white/5 border border-primary/10 dark:border-background-light/10 mr-2 mb-2">${char}</span>`
+                    `<span class="char-tag inline-block px-4 py-2 rounded-full text-xs bg-primary/5 border border-primary/10 mr-2 mb-2">${char}</span>`
                 ).join('');
 
                 const wineCard = `
-                    <div class="wine-card bg-white/60 dark:bg-black/30 backdrop-blur-sm border border-primary/10 dark:border-background-light/10 rounded-lg p-6 md:p-8 shadow-xl hover:shadow-2xl transition-shadow">
+                    <div class="wine-card bg-white/60 backdrop-blur-sm border border-primary/10 rounded-lg p-6 md:p-8 shadow-xl hover:shadow-2xl transition-shadow">
                         <div class="text-[10px] uppercase tracking-widest opacity-30 mb-1 font-mono">0${index + 1}</div>
 
-                        <h2 class="font-display text-2xl md:text-3xl mb-1"><a href="${wine.vivino_url}" target="_blank" class="text-primary dark:text-background-light hover:underline">${wine.name}</a></h2>
+                        <h2 class="font-display text-2xl md:text-3xl mb-1 text-primary">${wine.name}</h2>
                         <p class="font-mono text-2xl font-bold mt-2 mb-5">$${wine.price_usd.toFixed(2)}</p>
 
-                        <div class="bg-primary/5 dark:bg-white/5 border-l-4 border-primary dark:border-background-light p-4 rounded mb-5">
+                        <div class="bg-primary/5 border-l-4 border-primary p-4 rounded mb-5">
                             <div class="text-[10px] uppercase tracking-widest opacity-50 mb-2 font-bold">Why We Chose This</div>
                             <p class="font-sans italic text-base leading-relaxed">"${rec.explanation}"</p>
                         </div>
@@ -141,10 +140,17 @@
                             </div>
                         </div>
 
-                        <div class="mb-5">
-                            <div class="text-[10px] uppercase tracking-widest opacity-50 mb-2 font-bold">Characteristics</div>
-                            <div class="flex flex-wrap">
-                                ${charTags}
+                        <div class="grid grid-cols-2 gap-4 mb-5">
+                            <div>
+                                <div class="text-[10px] uppercase tracking-widest opacity-50 mb-2 font-bold">Characteristics</div>
+                                <div class="flex flex-wrap">
+                                    ${charTags}
+                                </div>
+                            </div>
+                            <div>
+                                <a href="${wine.vivino_url}" target="_blank" class="inline-block bg-primary text-white px-5 py-2 rounded-full font-sans font-medium text-xs hover:scale-105 transition-transform shadow-lg">
+                                    Buy Now
+                                </a>
                             </div>
                         </div>
 
