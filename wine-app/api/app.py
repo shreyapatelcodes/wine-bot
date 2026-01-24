@@ -542,4 +542,4 @@ if __name__ == "__main__":
     if missing:
         print(f"Warning: Missing configuration: {', '.join(missing)}")
 
-    app.run(debug=Config.DEBUG, port=5000)
+    app.run(debug=Config.DEBUG, port=5001)
