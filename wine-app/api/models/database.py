@@ -177,6 +177,9 @@ class CellarBottle(Base):
     custom_wine_producer: Mapped[Optional[str]] = mapped_column(String(255))
     custom_wine_vintage: Mapped[Optional[int]] = mapped_column(Integer)
     custom_wine_type: Mapped[Optional[str]] = mapped_column(String(20))
+    custom_wine_varietal: Mapped[Optional[str]] = mapped_column(String(100))
+    custom_wine_region: Mapped[Optional[str]] = mapped_column(String(100))
+    custom_wine_country: Mapped[Optional[str]] = mapped_column(String(100))
     custom_wine_metadata: Mapped[Optional[dict]] = mapped_column(JSONB)
 
     # Cellar status

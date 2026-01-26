@@ -104,6 +104,9 @@ export interface CellarBottleCreate {
   custom_wine_producer?: string;
   custom_wine_vintage?: number;
   custom_wine_type?: WineType;
+  custom_wine_varietal?: string;
+  custom_wine_region?: string;
+  custom_wine_country?: string;
   custom_wine_metadata?: WineMetadata;
   status?: CellarStatus;
   quantity?: number;
@@ -130,6 +133,9 @@ export interface CellarBottle {
   custom_wine_producer: string | null;
   custom_wine_vintage: number | null;
   custom_wine_type: WineType | null;
+  custom_wine_varietal: string | null;
+  custom_wine_region: string | null;
+  custom_wine_country: string | null;
   custom_wine_metadata: WineMetadata | null;
   status: CellarStatus;
   quantity: number;

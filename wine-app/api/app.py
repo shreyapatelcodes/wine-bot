@@ -3,6 +3,9 @@ Wine App API - Flask application with authentication and wine management.
 """
 
 import sys
+import base64
+import json
+import re
 from datetime import timedelta
 from pathlib import Path
 from flask import Flask, jsonify, request, g
@@ -11,6 +14,7 @@ from flask_jwt_extended import (
     get_jwt_identity,
     jwt_required as flask_jwt_required,
 )
+from openai import OpenAI
 
 from config import Config
 from auth.jwt import jwt, create_tokens, jwt_required, jwt_optional
@@ -31,6 +35,11 @@ from models.schemas import (
     CellarBottleUpdate,
     CellarBottleResponse,
     RecommendationRequest,
+    VisionAnalyzeRequest,
+    VisionAnalyzeResponse,
+    VisionMatchResponse,
+    WineSearchResult,
+    WineBase,
 )
 
 # Wine recommender path for lazy loading
@@ -368,6 +377,9 @@ def create_app():
                     "custom_wine_producer": b.custom_wine_producer,
                     "custom_wine_vintage": b.custom_wine_vintage,
                     "custom_wine_type": b.custom_wine_type,
+                    "custom_wine_varietal": b.custom_wine_varietal,
+                    "custom_wine_region": b.custom_wine_region,
+                    "custom_wine_country": b.custom_wine_country,
                     "custom_wine_metadata": b.custom_wine_metadata,
                     "status": b.status,
                     "quantity": b.quantity,
@@ -416,6 +428,9 @@ def create_app():
             custom_wine_producer=data.custom_wine_producer,
             custom_wine_vintage=data.custom_wine_vintage,
             custom_wine_type=data.custom_wine_type,
+            custom_wine_varietal=data.custom_wine_varietal,
+            custom_wine_region=data.custom_wine_region,
+            custom_wine_country=data.custom_wine_country,
             custom_wine_metadata=data.custom_wine_metadata,
             status=data.status,
             quantity=data.quantity,
@@ -621,6 +636,237 @@ def create_app():
             "recommendations": response_recs,
             "count": len(response_recs),
         })
+
+    # ============== Vision Endpoints ==============
+
+    def _analyze_wine_image(image_base64: str) -> dict:
+        """
+        Analyze a wine label image using OpenAI Vision API.
+        Returns extracted wine information.
+        """
+        client = OpenAI(api_key=Config.OPENAI_API_KEY)
+
+        # Clean up base64 string - remove data URL prefix if present
+        if "," in image_base64:
+            image_base64 = image_base64.split(",")[1]
+
+        # Detect image type from base64 or default to jpeg
+        image_type = "jpeg"
+        if image_base64.startswith("/9j/"):
+            image_type = "jpeg"
+        elif image_base64.startswith("iVBOR"):
+            image_type = "png"
+
+        prompt = """Analyze this wine label image and extract the following information.
+Return ONLY a valid JSON object with these fields (use null for any field you cannot determine):
+
+{
+    "name": "the wine name",
+    "producer": "the winery/producer name",
+    "vintage": 2020,
+    "wine_type": "red, white, rosé, or sparkling",
+    "varietal": "the grape variety (e.g., Cabernet Sauvignon, Chardonnay)",
+    "region": "the wine region (e.g., Napa Valley, Bordeaux)",
+    "country": "the country of origin",
+    "additional_info": "any other notable details from the label",
+    "confidence": 0.85
+}
+
+The confidence should be a number between 0 and 1 indicating how confident you are in the extraction.
+If this is not a wine label or you cannot extract wine information, return:
+{"name": null, "producer": null, "vintage": null, "wine_type": null, "varietal": null, "region": null, "country": null, "additional_info": "Unable to identify wine from image", "confidence": 0}"""
+
+        try:
+            response = client.chat.completions.create(
+                model=Config.OPENAI_VISION_MODEL,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/{image_type};base64,{image_base64}",
+                                    "detail": "high"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                max_tokens=500,
+            )
+
+            # Parse the JSON response
+            content = response.choices[0].message.content.strip()
+
+            # Try to extract JSON from the response (handle markdown code blocks)
+            json_match = re.search(r'\{[\s\S]*\}', content)
+            if json_match:
+                result = json.loads(json_match.group())
+                return result
+            else:
+                return {
+                    "name": None,
+                    "producer": None,
+                    "vintage": None,
+                    "wine_type": None,
+                    "varietal": None,
+                    "region": None,
+                    "country": None,
+                    "additional_info": "Failed to parse vision response",
+                    "confidence": 0
+                }
+
+        except Exception as e:
+            return {
+                "name": None,
+                "producer": None,
+                "vintage": None,
+                "wine_type": None,
+                "varietal": None,
+                "region": None,
+                "country": None,
+                "additional_info": f"Vision API error: {str(e)}",
+                "confidence": 0
+            }
+
+    @app.route("/api/v1/vision/analyze", methods=["POST"])
+    @jwt_required
+    def analyze_wine_image():
+        """Analyze a wine label image and extract wine information."""
+        try:
+            data = VisionAnalyzeRequest(**request.json)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 400
+
+        # Analyze the image
+        result = _analyze_wine_image(data.image)
+
+        return jsonify(VisionAnalyzeResponse(
+            name=result.get("name"),
+            producer=result.get("producer"),
+            vintage=result.get("vintage"),
+            wine_type=result.get("wine_type"),
+            varietal=result.get("varietal"),
+            region=result.get("region"),
+            country=result.get("country"),
+            additional_info=result.get("additional_info"),
+            confidence=result.get("confidence", 0),
+        ).model_dump(mode="json"))
+
+    @app.route("/api/v1/vision/match", methods=["POST"])
+    @jwt_required
+    def match_wine_image():
+        """Analyze a wine label image and find matching wines in the catalog."""
+        try:
+            data = VisionAnalyzeRequest(**request.json)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 400
+
+        # First, analyze the image
+        analysis = _analyze_wine_image(data.image)
+        analysis_response = VisionAnalyzeResponse(
+            name=analysis.get("name"),
+            producer=analysis.get("producer"),
+            vintage=analysis.get("vintage"),
+            wine_type=analysis.get("wine_type"),
+            varietal=analysis.get("varietal"),
+            region=analysis.get("region"),
+            country=analysis.get("country"),
+            additional_info=analysis.get("additional_info"),
+            confidence=analysis.get("confidence", 0),
+        )
+
+        # If we couldn't identify the wine, return empty matches
+        if analysis_response.confidence < 0.3 or not analysis_response.name:
+            return jsonify(VisionMatchResponse(
+                analysis=analysis_response,
+                matches=[],
+                best_match=None,
+            ).model_dump(mode="json"))
+
+        # Search for matching wines in the database
+        db = g.db
+
+        # Build search query based on extracted info
+        query = db.query(Wine)
+        matches = []
+
+        # Try to find exact matches first
+        if analysis_response.name and analysis_response.producer:
+            exact_matches = query.filter(
+                Wine.name.ilike(f"%{analysis_response.name}%"),
+                Wine.producer.ilike(f"%{analysis_response.producer}%"),
+            ).limit(5).all()
+
+            for wine in exact_matches:
+                score = 0.9  # High score for name + producer match
+                if analysis_response.vintage and wine.vintage == analysis_response.vintage:
+                    score = 0.95
+                matches.append((wine, score))
+
+        # If no exact matches, try broader search
+        if not matches:
+            search_terms = []
+            if analysis_response.name:
+                search_terms.append(Wine.name.ilike(f"%{analysis_response.name}%"))
+            if analysis_response.producer:
+                search_terms.append(Wine.producer.ilike(f"%{analysis_response.producer}%"))
+            if analysis_response.varietal:
+                search_terms.append(Wine.varietal.ilike(f"%{analysis_response.varietal}%"))
+
+            if search_terms:
+                from sqlalchemy import or_
+                broad_matches = query.filter(or_(*search_terms)).limit(10).all()
+
+                for wine in broad_matches:
+                    # Calculate relevance score based on matches
+                    score = 0.5
+                    if analysis_response.name and analysis_response.name.lower() in (wine.name or "").lower():
+                        score += 0.2
+                    if analysis_response.producer and analysis_response.producer.lower() in (wine.producer or "").lower():
+                        score += 0.15
+                    if analysis_response.varietal and analysis_response.varietal.lower() in (wine.varietal or "").lower():
+                        score += 0.1
+                    if analysis_response.vintage and wine.vintage == analysis_response.vintage:
+                        score += 0.05
+                    matches.append((wine, min(score, 0.95)))
+
+        # Sort by score and take top matches
+        matches.sort(key=lambda x: x[1], reverse=True)
+        matches = matches[:5]
+
+        # Build response
+        wine_matches = []
+        best_match = None
+
+        for wine, score in matches:
+            wine_base = WineBase(
+                id=wine.id,
+                name=wine.name,
+                producer=wine.producer,
+                vintage=wine.vintage,
+                wine_type=wine.wine_type,
+                varietal=wine.varietal,
+                country=wine.country,
+                region=wine.region,
+                price_usd=wine.price_usd,
+                wine_metadata=wine.wine_metadata or {},
+            )
+            wine_matches.append(WineSearchResult(
+                wine=wine_base,
+                relevance_score=score,
+            ))
+
+            if best_match is None:
+                best_match = wine_base
+
+        return jsonify(VisionMatchResponse(
+            analysis=analysis_response,
+            matches=wine_matches,
+            best_match=best_match,
+        ).model_dump(mode="json"))
 
     # ============== Error Handlers ==============
 

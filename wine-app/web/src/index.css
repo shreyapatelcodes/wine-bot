@@ -1,28 +1,30 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* Base styles */
 body {
-  @apply bg-gray-50 text-gray-900 antialiased;
+  @apply bg-cream text-gray-900 antialiased font-sans;
 }
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-transparent;
+  @apply bg-cream;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 rounded-full;
+  @apply bg-accent rounded-full;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400;
+  @apply bg-wine-300;
 }
 
 /* Focus styles */
@@ -33,6 +35,22 @@ body {
 /* Transitions */
 * {
   @apply transition-colors duration-200;
+}
+
+/* Custom utility classes */
+.heading-serif {
+  @apply font-serif italic text-gray-900;
+}
+
+.label-mono {
+  @apply font-mono text-xs uppercase tracking-wider text-gray-500;
+}
+
+/* Vertical text rotation for sidebar */
+.vertical-text {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
 }
 
 /* Custom animation delays for typing indicator */

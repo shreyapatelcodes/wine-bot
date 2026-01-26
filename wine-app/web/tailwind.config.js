@@ -20,6 +20,23 @@ export default {
           900: '#421d23',
           950: '#260c0f',
         },
+        cream: {
+          DEFAULT: '#F5F1E9',
+          light: '#FAF8F4',
+          dark: '#E9E1D4',
+        },
+        accent: {
+          light: '#E9E1D4',
+          DEFAULT: '#D4C9B8',
+        },
+      },
+      fontFamily: {
+        serif: ['Playfair Display', 'Georgia', 'serif'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Menlo', 'monospace'],
+      },
+      borderRadius: {
+        DEFAULT: '12px',
       },
       animation: {
         'bounce': 'bounce 1s infinite',

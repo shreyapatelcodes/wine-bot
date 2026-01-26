@@ -3,7 +3,7 @@
  */
 
 import { useState, useRef, type FormEvent, type KeyboardEvent } from 'react';
-import { Send, Loader2 } from 'lucide-react';
+import { Send, Loader2, Camera, ArrowRight } from 'lucide-react';
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -11,7 +11,7 @@ interface ChatInputProps {
   placeholder?: string;
 }
 
-export function ChatInput({ onSend, isLoading, placeholder = "Ask for wine recommendations..." }: ChatInputProps) {
+export function ChatInput({ onSend, isLoading, placeholder = "Ask about pairings, regions, or bottle IDs..." }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -43,8 +43,18 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask for wine recom
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-end gap-2">
-      <div className="flex-1 relative">
+    <form onSubmit={handleSubmit} className="relative bg-white rounded-2xl border border-gray-200 p-2 shadow-sm focus-within:ring-1 focus-within:ring-wine-500/20 focus-within:border-wine-500/30 transition-all">
+      <div className="flex items-center gap-2">
+        {/* Camera button */}
+        <button
+          type="button"
+          className="flex-shrink-0 p-2 text-gray-400 hover:text-wine-600 transition-colors rounded-lg hover:bg-cream"
+          title="Scan wine label"
+        >
+          <Camera className="w-5 h-5" />
+        </button>
+
+        {/* Text input */}
         <textarea
           ref={textareaRef}
           value={message}
@@ -54,20 +64,25 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask for wine recom
           placeholder={placeholder}
           disabled={isLoading}
           rows={1}
-          className="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 pr-12 text-sm focus:border-wine-500 focus:outline-none focus:ring-2 focus:ring-wine-500/20 disabled:bg-gray-50 disabled:text-gray-500"
+          className="flex-1 resize-none bg-transparent border-none px-2 py-2.5 text-sm focus:outline-none focus:ring-0 disabled:text-gray-400 placeholder:text-gray-400"
         />
+
+        {/* Submit button */}
+        <button
+          type="submit"
+          disabled={!message.trim() || isLoading}
+          className="flex-shrink-0 px-5 py-2.5 rounded-xl bg-wine-600 text-white flex items-center gap-2 hover:bg-wine-700 transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed shadow-lg shadow-wine-600/20"
+        >
+          {isLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <>
+              <span className="font-mono text-xs uppercase tracking-wider">Consult Agent</span>
+              <ArrowRight className="w-4 h-4" />
+            </>
+          )}
+        </button>
       </div>
-      <button
-        type="submit"
-        disabled={!message.trim() || isLoading}
-        className="flex-shrink-0 w-10 h-10 rounded-xl bg-wine-600 text-white flex items-center justify-center hover:bg-wine-700 transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
-      >
-        {isLoading ? (
-          <Loader2 className="w-5 h-5 animate-spin" />
-        ) : (
-          <Send className="w-5 h-5" />
-        )}
-      </button>
     </form>
   );
 }

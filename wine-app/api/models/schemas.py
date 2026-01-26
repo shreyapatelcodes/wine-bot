@@ -114,6 +114,9 @@ class CellarBottleCreate(BaseModel):
     custom_wine_producer: Optional[str] = None
     custom_wine_vintage: Optional[int] = None
     custom_wine_type: Optional[Literal["red", "white", "rosé", "sparkling"]] = None
+    custom_wine_varietal: Optional[str] = None
+    custom_wine_region: Optional[str] = None
+    custom_wine_country: Optional[str] = None
     custom_wine_metadata: Optional[dict] = None
 
     # Cellar info
@@ -146,6 +149,9 @@ class CellarBottleResponse(BaseModel):
     custom_wine_producer: Optional[str]
     custom_wine_vintage: Optional[int]
     custom_wine_type: Optional[str]
+    custom_wine_varietal: Optional[str]
+    custom_wine_region: Optional[str]
+    custom_wine_country: Optional[str]
     custom_wine_metadata: Optional[dict]
     status: str
     quantity: int

@@ -187,6 +187,20 @@ export function AddBottleModal({ isOpen, onClose }: AddBottleModalProps) {
                 />
               </div>
 
+              {/* Varietal */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Varietal / Grape
+                </label>
+                <input
+                  type="text"
+                  value={manualData.custom_wine_varietal || ''}
+                  onChange={(e) => setManualData({ ...manualData, custom_wine_varietal: e.target.value })}
+                  placeholder="e.g., Pinot Noir, Chardonnay"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-wine-500/20 focus:border-wine-500"
+                />
+              </div>
+
               {/* Vintage and Type */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
