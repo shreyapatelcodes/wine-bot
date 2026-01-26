@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PRD: Wine App Redesign</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #1a1a1a;
+      max-width: 8.5in;
+      margin: 0 auto;
+      padding: 0.75in;
+      font-size: 11pt;
+    }
+
+    h1 {
+      font-size: 24pt;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: #722F37;
+      border-bottom: 3px solid #722F37;
+      padding-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 12pt;
+      color: #666;
+      margin-bottom: 24px;
+    }
+
+    h2 {
+      font-size: 16pt;
+      font-weight: 600;
+      margin-top: 28px;
+      margin-bottom: 12px;
+      color: #722F37;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 4px;
+    }
+
+    h3 {
+      font-size: 13pt;
+      font-weight: 600;
+      margin-top: 20px;
+      margin-bottom: 8px;
+      color: #333;
+    }
+
+    h4 {
+      font-size: 11pt;
+      font-weight: 600;
+      margin-top: 16px;
+      margin-bottom: 6px;
+      color: #444;
+    }
+
+    p {
+      margin-bottom: 10px;
+    }
+
+    ul, ol {
+      margin-left: 20px;
+      margin-bottom: 12px;
+    }
+
+    li {
+      margin-bottom: 4px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 16px 0;
+      font-size: 10pt;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background-color: #f5f5f5;
+      font-weight: 600;
+      color: #333;
+    }
+
+    tr:nth-child(even) {
+      background-color: #fafafa;
+    }
+
+    .highlight-box {
+      background-color: #f8f4f5;
+      border-left: 4px solid #722F37;
+      padding: 12px 16px;
+      margin: 16px 0;
+    }
+
+    .page-break {
+      page-break-before: always;
+    }
+
+    code {
+      background-color: #f4f4f4;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      font-size: 10pt;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid #ddd;
+      margin: 24px 0;
+    }
+
+    .toc {
+      background-color: #f9f9f9;
+      padding: 16px 24px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+
+    .toc h3 {
+      margin-top: 0;
+    }
+
+    .toc ol {
+      margin-bottom: 0;
+    }
+
+    .principle {
+      margin-bottom: 8px;
+    }
+
+    .principle strong {
+      color: #722F37;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Product Requirements Document</h1>
+<p class="subtitle">Wine App Redesign — Information Architecture & Page Structure<br>
+Final Version • January 2025</p>
+
+<div class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li>Problem Statement</li>
+    <li>Design Principles</li>
+    <li>Key User Journeys</li>
+    <li>Page-by-Page Breakdown</li>
+    <li>Explicit Non-Goals</li>
+    <li>Open Questions / Risks</li>
+    <li>State Transition Rules</li>
+    <li>Constraints</li>
+    <li>Success Metrics</li>
+    <li>Implementation Phases</li>
+  </ol>
+</div>
+
+<h2>1. Problem Statement</h2>
+
+<p>The current app has working functionality but poor information architecture. Users face:</p>
+
+<ul>
+  <li>Too many entry points for overlapping features</li>
+  <li>Unclear where to go for common tasks (ask a question vs. get a recommendation vs. add a bottle)</li>
+  <li>No clear mental model for how the app is organized</li>
+  <li>Friction when saving wines discovered in chat to their collection</li>
+</ul>
+
+<div class="highlight-box">
+  <strong>Solution:</strong> Consolidate the app into two primary surfaces — <strong>Pip (Chat)</strong> for discovery and <strong>My Cellar</strong> for collection — with an opinionated flow between them.
+</div>
+
+<h2>2. Design Principles</h2>
+
+<ol>
+  <li class="principle"><strong>Chat is the front door</strong> — When in doubt, users should talk to Pip. Discovery, learning, and recommendations all happen through conversation.</li>
+  <li class="principle"><strong>Collection is for action, not browsing</strong> — The cellar exists to answer "what do I drink tonight?" and "do I already own this?" — not to be a wine database.</li>
+  <li class="principle"><strong>Fewer tabs, clearer states</strong> — A wine is either Owned, Tried, or Saved. No overlapping lists, no "favorites," no wishlist confusion.</li>
+  <li class="principle"><strong>Tactile saves</strong> — Moving a wine from chat to collection should feel deliberate and satisfying, not like a background sync.</li>
+  <li class="principle"><strong>Context flows forward</strong> — Actions like "What should I drink tonight?" carry collection context into chat; saves carry chat context back to collection.</li>
+</ol>
+
+<h2>3. Key User Journeys</h2>
+
+<h3>Journey A: "I want to learn about a wine I'm looking at"</h3>
+<ol>
+  <li>Open app → lands on Pip (chat)</li>
+  <li>Tap camera icon → take photo of label</li>
+  <li>Pip responds with wine info, tasting notes, food pairings</li>
+  <li>User taps "Save" → chooses Owned/Tried/Saved → wine appears in Cellar</li>
+  <li>(Optional) User edits wine details if scan was incomplete</li>
+</ol>
+
+<h3>Journey B: "What should I drink tonight?"</h3>
+<ol>
+  <li>Open app → navigate to My Cellar</li>
+  <li>Tap "What should I drink tonight?"</li>
+  <li>App opens Pip with context: "Based on your owned wines..."</li>
+  <li>Pip recommends a bottle from their collection</li>
+  <li>User opens wine detail → marks as "Tried" → adds rating</li>
+</ol>
+
+<h3>Journey C: "I had a wine I liked, want to remember it"</h3>
+<ol>
+  <li>Open app → Pip</li>
+  <li>Type "I just had a great Barolo at dinner" or upload photo</li>
+  <li>Pip confirms the wine, offers to save</li>
+  <li>User saves to "Tried" → rates it → adds notes</li>
+</ol>
+
+<h3>Journey D: "Add a bottle I just bought"</h3>
+<ol>
+  <li>Open app → My Cellar</li>
+  <li>Tap "+ Add Bottle"</li>
+  <li>Choose: Photo or Manual entry</li>
+  <li>Photo: camera opens, Pip extracts info, user reviews/edits, saves to Owned</li>
+  <li>Manual: structured form (name, producer, region, vintage, varietal)</li>
+</ol>
+
+<h3>Journey E: "I want to buy a wine I saved"</h3>
+<ol>
+  <li>Open app → My Cellar → Saved tab</li>
+  <li>Tap wine → opens detail page</li>
+  <li>Tap "Find this wine" → shows purchase options</li>
+  <li>After purchase, user moves wine to Owned</li>
+</ol>
+
+<div class="page-break"></div>
+
+<h2>4. Page-by-Page Breakdown</h2>
+
+<h3>4.1 Pip (Chat Screen)</h3>
+
+<p><strong>Purpose:</strong> Single interface for all discovery, learning, and recommendation tasks.</p>
+
+<h4>Primary Actions:</h4>
+<ul>
+  <li>Send a message (text input)</li>
+  <li>Upload a photo (camera icon in input field)</li>
+  <li>Tap quick-action chip ("Suggest a wine", "Explain")</li>
+</ul>
+
+<h4>Secondary Actions:</h4>
+<ul>
+  <li>Save a wine mentioned in chat to collection</li>
+  <li>View wine detail card (inline in chat)</li>
+</ul>
+
+<h4>Information Hierarchy:</h4>
+<ol>
+  <li>Pip's avatar + current response (top/center)</li>
+  <li>Conversation history (scrollable)</li>
+  <li>Input bar with camera + send (bottom, persistent)</li>
+  <li>Quick-action chips (above input, contextual)</li>
+</ol>
+
+<h4>Critical UI Components:</h4>
+<table>
+  <tr>
+    <th>Component</th>
+    <th>Behavior</th>
+  </tr>
+  <tr>
+    <td>Input field</td>
+    <td>Text entry; placeholder "Ask about xyz"</td>
+  </tr>
+  <tr>
+    <td>Camera button</td>
+    <td>Left of input; opens camera for label scan</td>
+  </tr>
+  <tr>
+    <td>Quick chips</td>
+    <td>Contextual shortcuts; idle state: "Suggest a wine", "Scan a label"; after wine mentioned: "Explain this wine", "Save", "Buy"</td>
+  </tr>
+  <tr>
+    <td>Wine card (in chat)</td>
+    <td>Expandable; shows name, region, vintage; tap opens full detail; has "Save" button</td>
+  </tr>
+  <tr>
+    <td>Save action</td>
+    <td>Tap triggers bottom sheet: Owned / Tried / Saved picker with confirmation animation</td>
+  </tr>
+</table>
+
+<h3>4.2 My Cellar</h3>
+
+<p><strong>Purpose:</strong> View and manage personal wine collection; launch contextual recommendations.</p>
+
+<h4>Primary Actions:</h4>
+<ul>
+  <li>Tap "What should I drink tonight?" → opens Pip with owned-wine context</li>
+  <li>Switch between Owned / Tried / Saved tabs</li>
+  <li>Tap a wine → view detail</li>
+</ul>
+
+<h4>Secondary Actions:</h4>
+<ul>
+  <li>Add a bottle (photo or manual)</li>
+  <li>Filter/search collection</li>
+</ul>
+
+<h4>Information Hierarchy:</h4>
+<ol>
+  <li>Page title "My Cellar" (top)</li>
+  <li>"What should I drink tonight?" prompt (prominent, below title)</li>
+  <li>Filter/search bar</li>
+  <li>Tab bar: Owned | Tried | Saved (sticky)</li>
+  <li>Wine grid (scrollable)</li>
+  <li>FAB: "+ Add Bottle" (floating, bottom-right)</li>
+</ol>
+
+<h4>Critical UI Components:</h4>
+<table>
+  <tr>
+    <th>Component</th>
+    <th>Behavior</th>
+  </tr>
+  <tr>
+    <td>"Drink tonight" CTA</td>
+    <td>Tapping opens Pip with system prompt: "Recommend something from my owned wines"</td>
+  </tr>
+  <tr>
+    <td>Tabs (Owned/Tried/Saved)</td>
+    <td>Mutually exclusive; badge shows count per tab</td>
+  </tr>
+  <tr>
+    <td>Filter bar</td>
+    <td>Expands to show: Type (Red/White/Rosé/Sparkling), Region, Vintage range, Rating</td>
+  </tr>
+  <tr>
+    <td>Wine tile</td>
+    <td>Thumbnail, name, vintage, rating stars (if rated); tap opens detail</td>
+  </tr>
+  <tr>
+    <td>FAB</td>
+    <td>Opens action sheet: "Scan Label" / "Enter Manually"</td>
+  </tr>
+  <tr>
+    <td>Empty state</td>
+    <td>Per-tab messaging; Saved: "Wines you save from chat appear here"</td>
+  </tr>
+</table>
+
+<h4>Filtering Behavior:</h4>
+<ul>
+  <li>Default: collapsed, showing only search field</li>
+  <li>Tap filter icon: expand to reveal Type, Region, Vintage, Rating filters</li>
+  <li>Active filters shown as chips below search bar</li>
+  <li>Filters persist within session, reset on app close</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h3>4.3 Wine Detail Page</h3>
+
+<p><strong>Purpose:</strong> Deep dive on a single wine; edit information; rate; change collection state; get Pip's recommendations; purchase (for Saved wines).</p>
+
+<p><strong>Layout:</strong> Two-column on tablet/desktop; single scroll on mobile.</p>
+
+<h4>Left Column / Top Section (Mobile):</h4>
+<ul>
+  <li>Large bottle image (or placeholder if none)</li>
+  <li>Authenticity badge: "Label Verified" (if scanned) or "Manual Entry"</li>
+  <li>Wine name (prominent, elegant typography)</li>
+  <li>Classification + Vintage (e.g., "PREMIER GRAND CRU CLASSÉ · 2015")</li>
+</ul>
+
+<h4>Right Column / Below Image (Mobile):</h4>
+<table>
+  <tr>
+    <th>Section</th>
+    <th>Content</th>
+  </tr>
+  <tr>
+    <td>Collection State</td>
+    <td>Segmented control: Owned / Tried / Saved (editable)</td>
+  </tr>
+  <tr>
+    <td>Rating</td>
+    <td>5-star input; tap to rate; shows current rating if set</td>
+  </tr>
+  <tr>
+    <td>The Story</td>
+    <td>Narrative description of the wine/producer (AI-generated or from database)</td>
+  </tr>
+  <tr>
+    <td>Technical Notes</td>
+    <td>Structured grid: Soil Composition, Aging, Varietals, Alcohol Content, Region, Producer</td>
+  </tr>
+  <tr>
+    <td>Sommelier's Tip</td>
+    <td>Pip's contextual advice: decanting time, serving temp, food pairings (sparkle icon indicates AI-generated)</td>
+  </tr>
+  <tr>
+    <td>Your Notes</td>
+    <td>User-editable text field; free-form tasting notes, occasion, etc.</td>
+  </tr>
+  <tr>
+    <td>Purchase Options</td>
+    <td>(Saved wines only) "Find this wine" button → shows retailer links/prices</td>
+  </tr>
+</table>
+
+<h4>Primary Actions:</h4>
+<ul>
+  <li>Change collection state (Owned/Tried/Saved)</li>
+  <li>Rate wine (tap stars)</li>
+  <li>Edit wine info (pencil icon → edit mode)</li>
+</ul>
+
+<h4>Secondary Actions:</h4>
+<ul>
+  <li>"Ask Pip about this wine" → opens chat with wine context</li>
+  <li>Add/edit personal notes</li>
+  <li>Purchase wine (Saved tab only)</li>
+  <li>Delete from collection</li>
+</ul>
+
+<h4>Edit Mode:</h4>
+<p>Triggered by pencil icon. Allows editing:</p>
+<ul>
+  <li>Wine name</li>
+  <li>Producer</li>
+  <li>Region</li>
+  <li>Vintage</li>
+  <li>Varietal</li>
+  <li>Alcohol %</li>
+  <li>Personal notes</li>
+</ul>
+<p>Pre-populated fields from scan/AI are editable; changes save locally to user's collection (don't override global wine data).</p>
+
+<h3>4.4 Add Bottle Flow</h3>
+
+<p><strong>Entry point:</strong> FAB in My Cellar</p>
+
+<h4>Step 1: Choose Method</h4>
+<p>Bottom sheet with two options:</p>
+<ul>
+  <li>"Scan Label" (camera icon) — recommended</li>
+  <li>"Enter Manually" (form icon)</li>
+</ul>
+
+<h4>Scan Label Path:</h4>
+<ol>
+  <li>Camera opens with viewfinder overlay</li>
+  <li>User captures label photo</li>
+  <li>Processing screen: "Pip is analyzing..."</li>
+  <li>Review screen shows extracted data with all fields editable</li>
+  <li>User selects collection state: Owned (default) / Tried / Saved</li>
+  <li>Optional: Add rating, notes</li>
+  <li>Confirm → wine added with success animation</li>
+</ol>
+
+<h4>Manual Entry Path:</h4>
+<ol>
+  <li>Form screen with fields: Wine name (required), Producer, Vintage, Region, Type, Varietal</li>
+  <li>User selects collection state</li>
+  <li>Optional: Add rating, notes</li>
+  <li>Confirm → wine added</li>
+</ol>
+
+<h3>4.5 Navigation Structure</h3>
+
+<h4>Bottom Navigation (2 tabs):</h4>
+<table>
+  <tr>
+    <th>Tab</th>
+    <th>Icon</th>
+    <th>Label</th>
+    <th>Destination</th>
+  </tr>
+  <tr>
+    <td>1</td>
+    <td>Chat bubble / sommelier</td>
+    <td>Pip</td>
+    <td>Chat screen</td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td>Wine glass / cellar</td>
+    <td>Cellar</td>
+    <td>My Cellar</td>
+  </tr>
+</table>
+
+<h4>Top Bar (contextual):</h4>
+<ul>
+  <li>Pip screen: "Pip" title, profile icon (right)</li>
+  <li>Cellar screen: "My Cellar" title, filter icon (right)</li>
+  <li>Detail screen: Back arrow, wine name, edit icon (right)</li>
+</ul>
+
+<p><strong>Profile/Settings:</strong> Accessible from Pip screen top-right. Contains account settings, notification preferences, data export, help/contact, logout.</p>
+
+<div class="page-break"></div>
+
+<h2>5. Explicit Non-Goals</h2>
+
+<table>
+  <tr>
+    <th>Non-Goal</th>
+    <th>Rationale</th>
+  </tr>
+  <tr>
+    <td>Social features</td>
+    <td>No sharing, following, or public profiles. Personal tool, not a social network.</td>
+  </tr>
+  <tr>
+    <td>Onboarding wizard</td>
+    <td>App should be self-evident. Pip introduces himself on first message.</td>
+  </tr>
+  <tr>
+    <td>Separate wishlist</td>
+    <td>"Saved" serves this purpose. One list for wines to acquire.</td>
+  </tr>
+  <tr>
+    <td>Wine database browsing</td>
+    <td>Users discover wines through Pip or real life, not by browsing a catalog.</td>
+  </tr>
+  <tr>
+    <td>Cellar value tracking</td>
+    <td>Not a portfolio tool. No price history, investment tracking, or total value calculations.</td>
+  </tr>
+  <tr>
+    <td>Barcode scanning</td>
+    <td>Label photo scanning only. Barcodes are less reliable and feel less premium.</td>
+  </tr>
+</table>
+
+<h2>6. Open Questions / Risks</h2>
+
+<table>
+  <tr>
+    <th>Question</th>
+    <th>Impact</th>
+    <th>Recommendation</th>
+  </tr>
+  <tr>
+    <td>How do we handle duplicate wines?</td>
+    <td>Data integrity; UX confusion</td>
+    <td>Detect on save; prompt "You already have this in Owned — add another bottle or view existing?"</td>
+  </tr>
+  <tr>
+    <td>What if label scan fails?</td>
+    <td>User frustration</td>
+    <td>Pip responds: "I couldn't read that label clearly. Want to try again or enter details manually?"</td>
+  </tr>
+  <tr>
+    <td>How does "Drink tonight" work with empty/small cellar?</td>
+    <td>Edge case UX</td>
+    <td>&lt;3 owned wines: Pip says "You have [n] bottles. Want me to recommend one, or suggest something new to buy?"</td>
+  </tr>
+  <tr>
+    <td>Should ratings be 5-star or 100-point?</td>
+    <td>User preference varies</td>
+    <td>Default to 5-star (simpler). Consider future setting for 100-point scale for enthusiasts.</td>
+  </tr>
+  <tr>
+    <td>How do we source purchase links?</td>
+    <td>Technical dependency</td>
+    <td>Use affiliate API (Wine-Searcher, Vivino). Fall back to "Search on Google" if no results.</td>
+  </tr>
+  <tr>
+    <td>What happens when a Saved wine is purchased?</td>
+    <td>State transition</td>
+    <td>User manually moves to Owned. Consider prompt after 30 days: "Still looking for this wine?"</td>
+  </tr>
+  <tr>
+    <td>How to handle multiple bottles of same wine?</td>
+    <td>Inventory tracking</td>
+    <td>For Owned: show quantity badge on tile; detail page has +/- stepper. Marking as Tried decrements by 1.</td>
+  </tr>
+</table>
+
+<h2>7. State Transition Rules</h2>
+
+<table>
+  <tr>
+    <th>From</th>
+    <th>To</th>
+    <th>Trigger</th>
+    <th>Behavior</th>
+  </tr>
+  <tr>
+    <td>(none)</td>
+    <td>Saved</td>
+    <td>Save from chat; manual add</td>
+    <td>Default for discoveries</td>
+  </tr>
+  <tr>
+    <td>(none)</td>
+    <td>Owned</td>
+    <td>Manual add; scan at purchase</td>
+    <td>User explicitly chooses</td>
+  </tr>
+  <tr>
+    <td>(none)</td>
+    <td>Tried</td>
+    <td>Save from chat with "I just had..." context</td>
+    <td>Pip infers intent</td>
+  </tr>
+  <tr>
+    <td>Saved</td>
+    <td>Owned</td>
+    <td>User updates state in detail</td>
+    <td>Implies purchase</td>
+  </tr>
+  <tr>
+    <td>Saved</td>
+    <td>Tried</td>
+    <td>User updates state in detail</td>
+    <td>Tried without owning (restaurant, friend's bottle)</td>
+  </tr>
+  <tr>
+    <td>Owned</td>
+    <td>Tried</td>
+    <td>User marks as tried; "Drink tonight" completion</td>
+    <td>Decrements owned count by 1</td>
+  </tr>
+  <tr>
+    <td>Tried</td>
+    <td>Owned</td>
+    <td>User updates state</td>
+    <td>Bought a wine they previously tried elsewhere</td>
+  </tr>
+  <tr>
+    <td>Any</td>
+    <td>(deleted)</td>
+    <td>User deletes from detail page</td>
+    <td>Confirmation required; hard delete</td>
+  </tr>
+</table>
+
+<div class="page-break"></div>
+
+<h2>8. Constraints</h2>
+
+<ul>
+  <li>Backend exists and supports all described functionality</li>
+  <li>"Saved" maps to existing wishlist data model</li>
+  <li>Rating system exists (confirm if 5-star or 100-point in current schema)</li>
+  <li>Mobile-first; assume iOS/Android native or React Native</li>
+  <li>Wine data enrichment (story, technical notes) sourced from existing Pip/AI capabilities</li>
+  <li>Purchase links require third-party integration (Wine-Searcher API or similar)</li>
+</ul>
+
+<h2>9. Success Metrics</h2>
+
+<table>
+  <tr>
+    <th>Metric</th>
+    <th>Target</th>
+    <th>Rationale</th>
+  </tr>
+  <tr>
+    <td>Time to first wine saved</td>
+    <td>&lt;60 seconds</td>
+    <td>Validates onboarding simplicity</td>
+  </tr>
+  <tr>
+    <td>Wines saved per active user per month</td>
+    <td>&gt;4</td>
+    <td>Indicates regular engagement</td>
+  </tr>
+  <tr>
+    <td>"Drink tonight" feature usage</td>
+    <td>&gt;30% of cellar visits</td>
+    <td>Validates core value prop</td>
+  </tr>
+  <tr>
+    <td>Scan success rate</td>
+    <td>&gt;85%</td>
+    <td>Technical quality bar</td>
+  </tr>
+  <tr>
+    <td>Cellar return rate (7-day)</td>
+    <td>&gt;50%</td>
+    <td>Users find collection valuable</td>
+  </tr>
+  <tr>
+    <td>Chat sessions per user per month</td>
+    <td>&gt;6</td>
+    <td>Pip is the discovery engine</td>
+  </tr>
+</table>
+
+<h2>10. Implementation Phases (Suggested)</h2>
+
+<h3>Phase 1: Core Restructure</h3>
+<ul>
+  <li>Two-tab navigation (Pip / Cellar)</li>
+  <li>Cellar with Owned / Tried / Saved tabs</li>
+  <li>Basic wine detail page (no edit, no purchase)</li>
+  <li>"Save to collection" flow from chat</li>
+</ul>
+
+<h3>Phase 2: Detail & Edit</h3>
+<ul>
+  <li>Full wine detail page with all sections</li>
+  <li>Edit mode for wine information</li>
+  <li>Rating system</li>
+  <li>"What should I drink tonight?" feature</li>
+</ul>
+
+<h3>Phase 3: Advanced Features</h3>
+<ul>
+  <li>Advanced filtering in Cellar</li>
+  <li>Purchase integration for Saved wines</li>
+  <li>Multiple bottle quantity tracking</li>
+  <li>State transition prompts</li>
+</ul>
+
+<hr>
+
+<p style="text-align: center; color: #666; margin-top: 32px; font-size: 10pt;">
+  PRD: Wine App Redesign • Final Version • January 2025
+</p>
+
+</body>
+</html>
