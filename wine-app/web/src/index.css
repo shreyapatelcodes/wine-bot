@@ -6,7 +6,8 @@
 
 /* Base styles */
 body {
-  @apply bg-cream text-gray-900 antialiased font-sans;
+  background-color: #F5F1E9;
+  @apply text-gray-900 antialiased font-sans;
 }
 
 /* Scrollbar styling */
@@ -16,20 +17,22 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-cream;
+  background-color: #F5F1E9;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-accent rounded-full;
+  background-color: #D4C9B8;
+  @apply rounded-full;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-wine-300;
+  background-color: #f4a9bc;
 }
 
 /* Focus styles */
 *:focus-visible {
-  @apply outline-none ring-2 ring-wine-500/50 ring-offset-2;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(225, 74, 114, 0.5);
 }
 
 /* Transitions */
