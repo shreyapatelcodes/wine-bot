@@ -2,12 +2,34 @@
 OAuth handler for Google Sign-In (web only).
 """
 
+import base64
+import json
 from datetime import datetime, timezone
 from typing import Optional
 import httpx
 
 from config import Config
 from models.database import User, SessionLocal
+
+
+def _decode_jwt_payload(token: str) -> Optional[dict]:
+    """Decode the payload from a JWT without verification (verification done by Google)."""
+    try:
+        # JWT is header.payload.signature
+        parts = token.split('.')
+        if len(parts) != 3:
+            return None
+
+        # Decode payload (add padding if needed)
+        payload = parts[1]
+        padding = 4 - len(payload) % 4
+        if padding != 4:
+            payload += '=' * padding
+
+        decoded = base64.urlsafe_b64decode(payload)
+        return json.loads(decoded)
+    except Exception:
+        return None
 
 
 def verify_google_token(id_token: str) -> Optional[dict]:
@@ -27,21 +49,31 @@ def verify_google_token(id_token: str) -> Optional[dict]:
             )
 
             if response.status_code != 200:
+                print(f"[OAuth] Token verification failed: {response.status_code} - {response.text}")
                 return None
 
             data = response.json()
 
             # Verify the token was issued for our app
             if data.get("aud") != Config.GOOGLE_CLIENT_ID:
+                print(f"[OAuth] Client ID mismatch: token aud={data.get('aud')}, expected={Config.GOOGLE_CLIENT_ID}")
                 return None
+
+            # The tokeninfo endpoint doesn't return picture, so decode it from the JWT
+            picture = data.get("picture")
+            if not picture:
+                jwt_payload = _decode_jwt_payload(id_token)
+                if jwt_payload:
+                    picture = jwt_payload.get("picture")
 
             return {
                 "sub": data.get("sub"),
                 "email": data.get("email"),
                 "name": data.get("name"),
-                "picture": data.get("picture"),
+                "picture": picture,
             }
-    except Exception:
+    except Exception as e:
+        print(f"[OAuth] Exception during token verification: {e}")
         return None
 
 
@@ -101,7 +133,8 @@ def google_auth(id_token: str) -> tuple[Optional[User], bool]:
 
         return user, is_new
 
-    except Exception:
+    except Exception as e:
+        print(f"[OAuth] Database error: {e}")
         db.rollback()
         return None, False
     finally:

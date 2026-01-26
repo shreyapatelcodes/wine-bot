@@ -2,7 +2,9 @@
 Wine App API - Flask application with authentication and wine management.
 """
 
+import sys
 from datetime import timedelta
+from pathlib import Path
 from flask import Flask, jsonify, request, g
 from flask_cors import CORS
 from flask_jwt_extended import (
@@ -30,6 +32,46 @@ from models.schemas import (
     CellarBottleResponse,
     RecommendationRequest,
 )
+
+# Wine recommender path for lazy loading
+_wine_recommender_path = Path(__file__).parent.parent.parent / "wine-recommender"
+_recommender_engine = None
+_recommender_prefs_class = None
+
+
+def _get_recommender():
+    """Lazy load the wine recommender to avoid module conflicts."""
+    global _recommender_engine, _recommender_prefs_class
+    if _recommender_engine is None:
+        import importlib.util
+
+        # Save current modules that might conflict
+        saved_modules = {}
+        for mod_name in list(sys.modules.keys()):
+            if mod_name == 'models' or mod_name.startswith('models.'):
+                saved_modules[mod_name] = sys.modules.pop(mod_name)
+            if mod_name == 'config' or mod_name.startswith('config.'):
+                saved_modules[mod_name] = sys.modules.pop(mod_name)
+
+        # Add wine-recommender to path
+        sys.path.insert(0, str(_wine_recommender_path))
+
+        try:
+            # Load wine-recommender's modules fresh
+            from agents.orchestrator import get_wine_recommendations
+            from models.schemas import UserPreferences
+            _recommender_engine = get_wine_recommendations
+            _recommender_prefs_class = UserPreferences
+        finally:
+            # Remove wine-recommender from path
+            if str(_wine_recommender_path) in sys.path:
+                sys.path.remove(str(_wine_recommender_path))
+
+            # Restore wine-app's modules
+            for mod_name, mod in saved_modules.items():
+                sys.modules[mod_name] = mod
+
+    return _recommender_engine, _recommender_prefs_class
 
 
 def create_app():
@@ -500,23 +542,84 @@ def create_app():
             "count": len(wines),
         })
 
-    # ============== Recommendations Endpoint (placeholder) ==============
+    # ============== Recommendations Endpoint ==============
 
     @app.route("/api/v1/recommendations", methods=["POST"])
     @jwt_optional
     def get_recommendations():
-        """Get wine recommendations. Full implementation in Phase 6."""
+        """Get wine recommendations using the wine-recommender engine."""
         try:
             data = RecommendationRequest(**request.json)
         except Exception as e:
             return jsonify({"error": str(e)}), 400
 
-        # TODO: Implement full recommendation logic
-        # For now, return placeholder
+        # Lazy load the recommender engine
+        get_recommendations_from_engine, UserPreferences = _get_recommender()
+
+        # Convert to wine-recommender's UserPreferences format
+        user_prefs = UserPreferences(
+            description=data.description,
+            budget_min=data.budget_min or 10.0,
+            budget_max=data.budget_max or 200.0,
+            food_pairing=data.food_pairing,
+            wine_type_pref=data.wine_type_pref,
+        )
+
+        try:
+            # Get recommendations from the engine
+            recommendations = get_recommendations_from_engine(user_prefs, top_n=3)
+        except Exception as e:
+            return jsonify({"error": f"Recommendation engine error: {str(e)}"}), 500
+
+        # Get user's saved/cellar wine IDs for status flags
+        saved_wine_ids = set()
+        cellar_wine_ids = set()
+        user = getattr(g, 'current_user', None)
+        if user:
+            db = g.db
+            saved_wine_ids = {
+                sb.wine_id for sb in
+                db.query(SavedBottle).filter(SavedBottle.user_id == user.id).all()
+            }
+            cellar_wine_ids = {
+                cb.wine_id for cb in
+                db.query(CellarBottle).filter(CellarBottle.user_id == user.id).all()
+                if cb.wine_id
+            }
+
+        # Map recommendations to response format
+        response_recs = []
+        for rec in recommendations:
+            wine = rec.wine
+            response_recs.append({
+                "wine": {
+                    "id": wine.id,
+                    "name": wine.name,
+                    "producer": wine.producer,
+                    "vintage": wine.vintage,
+                    "wine_type": wine.wine_type,
+                    "varietal": wine.varietal,
+                    "country": wine.country,
+                    "region": wine.region,
+                    "price_usd": wine.price_usd,
+                    "metadata": {
+                        "body": wine.body,
+                        "sweetness": wine.sweetness,
+                        "acidity": wine.acidity,
+                        "tannin": wine.tannin,
+                        "characteristics": wine.characteristics,
+                        "flavor_notes": wine.flavor_notes,
+                    },
+                },
+                "explanation": rec.explanation,
+                "relevance_score": rec.relevance_score,
+                "is_saved": wine.id in saved_wine_ids,
+                "is_in_cellar": wine.id in cellar_wine_ids,
+            })
+
         return jsonify({
-            "recommendations": [],
-            "count": 0,
-            "message": "Recommendation engine not yet implemented",
+            "recommendations": response_recs,
+            "count": len(response_recs),
         })
 
     # ============== Error Handlers ==============
