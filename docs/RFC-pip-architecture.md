@@ -72,6 +72,7 @@ This RFC describes the technical architecture for rebuilding wine-app as a chat-
 3. PreferenceInterpreter doesn't extract filters from natural language (just passes through)
 4. No intent classification — everything goes to recommendations
 5. No profile synthesis capability
+6. **Explanation attribution bug:** Agent 2 attributes system-inferred category knowledge to user preferences ("Based on your preference for bold fruit..." when user just said "California red")
 
 ---
 
@@ -235,6 +236,99 @@ class PreferenceInterpreter:
         """
         return self.llm.extract(prompt, ExtractedFilters)
 ```
+
+---
+
+### 2b. Honest Explanation Generation (Fix)
+
+**Problem:** Currently, Agent 2 conflates what the user asked for with what the system inferred about a wine category.
+
+```
+User: "California red wine"
+Agent 1: Queries WSET → "California reds are bold, oaky, ripe tannins..."
+Agent 2: "Based on your preference for bold fruit and oak..." ← WRONG
+User: "I never said that!"
+```
+
+**Root cause:** `create_agent2_explanation_prompt` receives both:
+- `user_preferences`: What the user said ("California red wine")
+- `search_query`: The enriched query from Agent 1 ("bold, oaky, ripe tannins...")
+
+The LLM conflates these, attributing system inferences to the user.
+
+**Fix:** Separate user constraints from category knowledge in the data flow.
+
+**Change 1: Extend SearchQuery to include category knowledge**
+
+```python
+class SearchQuery(BaseModel):
+    query_text: str                    # For vector search
+    category_knowledge: str            # NEW: What we learned about the category
+    user_request: str                  # NEW: Original user request (preserved)
+    price_range: tuple[float, float]
+    wine_type_filter: str | None
+    region_filter: str | None
+    # ... other filters
+```
+
+**Change 2: Agent 1 returns both query and knowledge separately**
+
+```python
+class PreferenceInterpreter:
+    def interpret(self, user_prefs: UserPreferences) -> SearchQuery:
+        # Query WSET knowledge
+        wset_chunks = search_wset_knowledge(user_prefs.description)
+        category_knowledge = self._summarize_category(wset_chunks)
+
+        # Generate search query
+        query_text = self._generate_search_query(user_prefs.description, wset_chunks)
+
+        return SearchQuery(
+            query_text=query_text,
+            category_knowledge=category_knowledge,  # What we learned
+            user_request=user_prefs.description,    # What user said
+            # ... filters
+        )
+```
+
+**Change 3: New explanation prompt that maintains honesty**
+
+```python
+def create_agent2_explanation_prompt(
+    user_request: str,           # What user actually said
+    category_knowledge: str,     # What we know about that category
+    wine: Wine
+) -> str:
+    return f"""Generate a 1-2 sentence explanation for why this wine is a good match.
+
+CRITICAL: The user asked for "{user_request}". Only attribute preferences they explicitly stated.
+
+Category context (for your understanding, not to attribute to user): {category_knowledge}
+
+Wine: {wine.name} ({wine.varietal}, {wine.region})
+Characteristics: {", ".join(wine.characteristics)}
+Flavor notes: {", ".join(wine.flavor_notes)}
+
+Rules:
+- Reference what the user actually asked for
+- You may briefly educate about the category ("California reds are known for...")
+- Connect this wine to both the request and category
+- NEVER say "based on your preference for X" unless user explicitly said X
+
+Good: "You asked for a California red — this Napa Cab delivers the bold fruit and soft tannins the region is known for."
+Bad: "Based on your preference for bold fruit and oak..." (user never said this)
+
+Explanation:"""
+```
+
+**Example transformation:**
+
+| Before | After |
+|--------|-------|
+| "Based on your preference for bold, oaky wines, this Napa Cab is perfect with its rich tannins." | "You asked for a California red — this Napa Cab is a classic example, with the bold fruit and soft oak the region is known for." |
+| "This matches your love of earthy, full-bodied reds." | "You wanted something earthy — this Barolo delivers, with the truffle and leather notes Nebbiolo is famous for." |
+
+**Key principle:** Be honest about what's user preference vs. system knowledge. Educate, don't fabricate.
 
 ---
 
@@ -656,12 +750,13 @@ interface Card {
 ### Phase 1: Backend Extensions
 1. Add ChatOrchestrator with intent classification
 2. Add NLP extraction to PreferenceInterpreter
-3. Add EducationAgent
-4. Add CellarAgent
-5. Add ProfileService and ProfileAgent
-6. Add DecideAgent
-7. Add POST /api/v1/chat endpoint
-8. Add UserProfile table migration
+3. Fix explanation attribution (separate user_request from category_knowledge in SearchQuery)
+4. Add EducationAgent
+5. Add CellarAgent
+6. Add ProfileService and ProfileAgent
+7. Add DecideAgent
+8. Add POST /api/v1/chat endpoint
+9. Add UserProfile table migration
 
 ### Phase 2: Frontend Rebuild
 1. Build new ChatContainer with card rendering
@@ -709,3 +804,4 @@ interface Card {
 3. Rating a wine updates profile (visible when asking "what do I like?")
 4. Empty states are handled gracefully
 5. Off-topic questions redirect politely
+6. Explanations only attribute preferences user actually expressed (no fabricated preferences)
