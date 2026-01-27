@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react';
-import { Wine, Star, Edit2, Trash2, Check, X, Minus, Plus } from 'lucide-react';
+import { Wine, Star, Edit2, Trash2, Check, X } from 'lucide-react';
 import type { CellarBottle, CellarBottleUpdate, CellarStatus } from '../../types';
 
 interface CellarBottleCardProps {
@@ -175,7 +175,10 @@ export function CellarBottleCard({ bottle, onUpdate, onRemove, onClick }: Cellar
 
       {/* Edit modal overlay */}
       {isEditing && (
-        <div className="absolute inset-0 bg-white z-10 p-4 overflow-y-auto">
+        <div
+          className="absolute inset-0 bg-white z-10 p-4 overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-serif text-lg">Edit Bottle</h4>
             <div className="flex gap-1">
@@ -216,28 +219,6 @@ export function CellarBottleCard({ bottle, onUpdate, onRemove, onClick }: Cellar
                 ))}
               </div>
             </div>
-
-            {/* Quantity */}
-            {editData.status === 'owned' && (
-              <div>
-                <label className="font-mono text-[10px] uppercase tracking-wider text-gray-500">Quantity</label>
-                <div className="flex items-center gap-3 mt-2">
-                  <button
-                    onClick={() => setEditData({ ...editData, quantity: Math.max(1, (editData.quantity || 1) - 1) })}
-                    className="p-2 bg-cream rounded-lg hover:bg-cream-dark"
-                  >
-                    <Minus className="w-4 h-4" />
-                  </button>
-                  <span className="w-8 text-center font-mono text-lg">{editData.quantity || 1}</span>
-                  <button
-                    onClick={() => setEditData({ ...editData, quantity: (editData.quantity || 1) + 1 })}
-                    className="p-2 bg-cream rounded-lg hover:bg-cream-dark"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Rating */}
             <div>

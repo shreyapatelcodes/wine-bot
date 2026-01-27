@@ -2,9 +2,13 @@
  * Chat page - main recommendation interface
  */
 
+import { useSearchParams } from 'react-router-dom';
 import { ChatContainer } from '../components/chat';
 
 export function ChatPage() {
+  const [searchParams] = useSearchParams();
+  const initialContext = searchParams.get('context') === 'drink-tonight' ? 'drink-tonight' : undefined;
+
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col">
       {/* Page header */}
@@ -25,7 +29,7 @@ export function ChatPage() {
       {/* Chat container */}
       <div className="flex-1 px-6 md:px-8 pb-4 overflow-hidden">
         <div className="max-w-4xl mx-auto h-full">
-          <ChatContainer />
+          <ChatContainer initialContext={initialContext} />
         </div>
       </div>
     </div>

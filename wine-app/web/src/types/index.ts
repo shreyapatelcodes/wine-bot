@@ -124,6 +124,13 @@ export interface CellarBottleUpdate {
   tasting_notes?: string;
   tried_date?: string;
   notes?: string;
+  // Custom wine field updates (for editing wine information)
+  custom_wine_name?: string;
+  custom_wine_producer?: string;
+  custom_wine_vintage?: number;
+  custom_wine_varietal?: string;
+  custom_wine_region?: string;
+  custom_wine_country?: string;
 }
 
 export interface CellarBottle {

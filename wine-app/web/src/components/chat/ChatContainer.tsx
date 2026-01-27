@@ -19,7 +19,11 @@ const quickSuggestions = [
   'Under $30 reds',
 ];
 
-export function ChatContainer() {
+interface ChatContainerProps {
+  initialContext?: 'drink-tonight';
+}
+
+export function ChatContainer({ initialContext }: ChatContainerProps) {
   const { messages, isLoading, sendMessage, clearChat } = useChat();
   const { addBottle } = useCellar();
   const { isAuthenticated } = useAuth();
@@ -31,6 +35,13 @@ export function ChatContainer() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Handle "What should I drink tonight?" context from Cellar page
+  useEffect(() => {
+    if (initialContext === 'drink-tonight' && messages.length === 1) {
+      sendMessage('What should I drink tonight from my cellar?', { from_cellar: true });
+    }
+  }, [initialContext, messages.length, sendMessage]);
 
   const handleSaveWineClick = useCallback(async (wine: Wine) => {
     if (!isAuthenticated) return;

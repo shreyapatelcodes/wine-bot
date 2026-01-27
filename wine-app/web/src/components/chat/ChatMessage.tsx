@@ -23,7 +23,7 @@ export function ChatMessage({ message, onSaveWine }: ChatMessageProps) {
         </div>
       ) : (
         <div className="w-10 h-10 rounded-full bg-wine-600 flex items-center justify-center flex-shrink-0">
-          <span className="font-serif text-white text-lg">V</span>
+          <span className="font-serif text-white text-lg">P</span>
         </div>
       )}
 

@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Bookmark, Check } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 interface SavedToastProps {
   isVisible: boolean;

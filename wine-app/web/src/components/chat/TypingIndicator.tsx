@@ -5,9 +5,9 @@
 export function TypingIndicator() {
   return (
     <div className="flex gap-4 items-start">
-      {/* V avatar */}
+      {/* P avatar */}
       <div className="w-10 h-10 rounded-full bg-wine-600 flex items-center justify-center flex-shrink-0">
-        <span className="font-serif text-white text-lg">V</span>
+        <span className="font-serif text-white text-lg">P</span>
       </div>
 
       {/* Typing dots */}

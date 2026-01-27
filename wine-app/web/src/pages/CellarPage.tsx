@@ -3,6 +3,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Lock, Camera, Search, Sparkles, PenLine } from 'lucide-react';
 import { CellarList, AddBottleModal } from '../components/cellar';
 import { LoginModal } from '../components/auth';
@@ -15,6 +16,7 @@ import type { VisionMatchResponse, Wine } from '../types';
 type AddMode = 'manual' | 'search';
 
 export function CellarPage() {
+  const navigate = useNavigate();
   const { isAuthenticated, isLoading } = useAuth();
   const { addBottle } = useCellar();
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -150,7 +152,10 @@ export function CellarPage() {
             {/* Action buttons - inline */}
             <div className="flex flex-wrap items-center gap-3 mt-6">
               {/* What should I drink tonight - red filled */}
-              <button className="flex items-center gap-2 px-5 py-2.5 bg-wine-600 text-white rounded-xl hover:bg-wine-700 transition-colors group">
+              <button
+                onClick={() => navigate('/?context=drink-tonight')}
+                className="flex items-center gap-2 px-5 py-2.5 bg-wine-600 text-white rounded-xl hover:bg-wine-700 transition-colors group"
+              >
                 <Sparkles className="w-4 h-4" />
                 <span className="font-mono text-xs uppercase tracking-wider">What should I drink tonight?</span>
               </button>
