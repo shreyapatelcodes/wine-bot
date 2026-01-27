@@ -3,22 +3,35 @@
  */
 
 import { useState } from 'react';
-import { Wine, Loader2, Package, CheckCircle, Heart } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Wine, Loader2, Package, CheckCircle, Bookmark } from 'lucide-react';
 import { useCellar, useCellarStats } from '../../hooks';
 import { CellarBottleCard } from './CellarBottleCard';
 import type { CellarStatus } from '../../types';
 
-const statusFilters: { value: CellarStatus | undefined; label: string; icon: React.ReactNode }[] = [
-  { value: undefined, label: 'All', icon: <Wine className="w-4 h-4" /> },
+const statusFilters: { value: CellarStatus; label: string; icon: React.ReactNode }[] = [
   { value: 'owned', label: 'Owned', icon: <Package className="w-4 h-4" /> },
   { value: 'tried', label: 'Tried', icon: <CheckCircle className="w-4 h-4" /> },
-  { value: 'wishlist', label: 'Wishlist', icon: <Heart className="w-4 h-4" /> },
+  { value: 'wishlist', label: 'Saved', icon: <Bookmark className="w-4 h-4" /> },
 ];
 
 export function CellarList() {
-  const [statusFilter, setStatusFilter] = useState<CellarStatus | undefined>(undefined);
+  const navigate = useNavigate();
+  const [statusFilter, setStatusFilter] = useState<CellarStatus>('owned');
   const { bottles, isLoading, error, updateBottle, removeBottle } = useCellar(statusFilter);
   const stats = useCellarStats();
+
+  // Get count for each filter
+  const getFilterCount = (value: CellarStatus): number => {
+    if (value === 'owned') return stats.owned;
+    if (value === 'tried') return stats.tried;
+    if (value === 'wishlist') return stats.wishlist;
+    return 0;
+  };
+
+  const handleBottleClick = (bottleId: string) => {
+    navigate(`/wine/${bottleId}`);
+  };
 
   if (isLoading) {
     return (
@@ -37,43 +50,35 @@ export function CellarList() {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-5 border border-gray-100">
-          <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500">Total</p>
-          <p className="font-serif text-4xl text-gray-900 mt-1">{stats.totalBottles}</p>
-        </div>
-        <div className="bg-white rounded-xl p-5 border border-gray-100">
-          <p className="font-mono text-[10px] uppercase tracking-wider text-green-600">Owned</p>
-          <p className="font-serif text-4xl text-green-700 mt-1">{stats.owned}</p>
-        </div>
-        <div className="bg-white rounded-xl p-5 border border-gray-100">
-          <p className="font-mono text-[10px] uppercase tracking-wider text-blue-600">Tried</p>
-          <p className="font-serif text-4xl text-blue-700 mt-1">{stats.tried}</p>
-        </div>
-        <div className="bg-white rounded-xl p-5 border border-gray-100">
-          <p className="font-mono text-[10px] uppercase tracking-wider text-purple-600">Wishlist</p>
-          <p className="font-serif text-4xl text-purple-700 mt-1">{stats.wishlist}</p>
-        </div>
-      </div>
-
-      {/* Filter tabs */}
+    <div className="space-y-6">
+      {/* Filter tabs with badge counts */}
       <div className="flex flex-wrap gap-2">
-        {statusFilters.map((filter) => (
-          <button
-            key={filter.label}
-            onClick={() => setStatusFilter(filter.value)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-colors ${
-              statusFilter === filter.value
-                ? 'bg-wine-600 text-white'
-                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
-            }`}
-          >
-            {filter.icon}
-            <span className="font-mono text-xs uppercase tracking-wider">{filter.label}</span>
-          </button>
-        ))}
+        {statusFilters.map((filter) => {
+          const count = getFilterCount(filter.value);
+          return (
+            <button
+              key={filter.label}
+              onClick={() => setStatusFilter(filter.value)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-colors ${
+                statusFilter === filter.value
+                  ? 'bg-wine-600 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+              }`}
+            >
+              {filter.icon}
+              <span className="font-mono text-xs uppercase tracking-wider">{filter.label}</span>
+              {count > 0 && (
+                <span className={`font-mono text-xs px-1.5 py-0.5 rounded-full ${
+                  statusFilter === filter.value
+                    ? 'bg-white/20 text-white'
+                    : 'bg-gray-100 text-gray-500'
+                }`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Bottles grid */}
@@ -99,6 +104,7 @@ export function CellarList() {
               bottle={bottle}
               onUpdate={updateBottle}
               onRemove={removeBottle}
+              onClick={() => handleBottleClick(bottle.id)}
             />
           ))}
         </div>

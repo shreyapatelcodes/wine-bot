@@ -3,12 +3,12 @@
  */
 
 import { User } from 'lucide-react';
-import type { ChatMessage as ChatMessageType } from '../../types';
+import type { ChatMessage as ChatMessageType, Wine } from '../../types';
 import { WineCard } from './WineCard';
 
 interface ChatMessageProps {
   message: ChatMessageType;
-  onSaveWine?: (wineId: string) => void;
+  onSaveWine?: (wine: Wine) => void;
 }
 
 export function ChatMessage({ message, onSaveWine }: ChatMessageProps) {
@@ -32,7 +32,7 @@ export function ChatMessage({ message, onSaveWine }: ChatMessageProps) {
         {/* Sender label and timestamp */}
         <div className={`flex items-center gap-3 mb-2 ${isUser ? 'flex-row-reverse' : ''}`}>
           <span className="font-mono text-[10px] uppercase tracking-wider text-gray-900 font-medium">
-            {isUser ? 'You' : 'Sommelier AI'}
+            {isUser ? 'You' : 'Pip'}
           </span>
           <span className="font-mono text-[10px] uppercase tracking-wider text-gray-400">
             {new Date(message.timestamp).toLocaleTimeString([], {

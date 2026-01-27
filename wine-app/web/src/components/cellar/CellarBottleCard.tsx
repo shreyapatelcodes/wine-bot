@@ -10,9 +10,10 @@ interface CellarBottleCardProps {
   bottle: CellarBottle;
   onUpdate: (id: string, data: CellarBottleUpdate) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
+  onClick?: () => void;
 }
 
-export function CellarBottleCard({ bottle, onUpdate, onRemove }: CellarBottleCardProps) {
+export function CellarBottleCard({ bottle, onUpdate, onRemove, onClick }: CellarBottleCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<CellarBottleUpdate>({
     status: bottle.status,
@@ -72,11 +73,11 @@ export function CellarBottleCard({ bottle, onUpdate, onRemove }: CellarBottleCar
     setIsEditing(false);
   };
 
-  // Convert 5-star rating to points (rough approximation: 5 stars = 100pts, 4 = 90, etc.)
-  const ratingToPoints = (rating: number) => Math.round(80 + rating * 4);
-
   return (
-    <div className="relative bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-lg transition-all group">
+    <div
+      className="relative bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-lg transition-all group cursor-pointer"
+      onClick={onClick}
+    >
       {/* Wine image area */}
       <div className="relative h-48 bg-cream flex items-center justify-center">
         {bottle.image_url ? (
@@ -88,13 +89,6 @@ export function CellarBottleCard({ bottle, onUpdate, onRemove }: CellarBottleCar
         ) : (
           <div className="w-24 h-32 bg-white/50 rounded-lg flex items-center justify-center">
             <Wine className={`w-12 h-12 ${getWineTypeColor(wineType)}`} />
-          </div>
-        )}
-
-        {/* Point rating badge */}
-        {bottle.rating && (
-          <div className="absolute top-3 right-3 bg-white text-gray-900 font-mono text-xs px-2 py-1 rounded-lg shadow-sm border border-gray-100">
-            {ratingToPoints(bottle.rating)} PTS
           </div>
         )}
 
@@ -157,19 +151,19 @@ export function CellarBottleCard({ bottle, onUpdate, onRemove }: CellarBottleCar
         {/* Status tag and actions */}
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
           <span className={`font-mono text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-lg ${getStatusColor(bottle.status)}`}>
-            {bottle.status}
+            {bottle.status === 'wishlist' ? 'saved' : bottle.status}
           </span>
 
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
-              onClick={() => setIsEditing(true)}
+              onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
               className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
               title="Edit"
             >
               <Edit2 className="w-4 h-4" />
             </button>
             <button
-              onClick={() => onRemove(bottle.id)}
+              onClick={(e) => { e.stopPropagation(); onRemove(bottle.id); }}
               className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
               title="Remove"
             >
@@ -204,7 +198,7 @@ export function CellarBottleCard({ bottle, onUpdate, onRemove }: CellarBottleCar
 
           <div className="space-y-4">
             {/* Status */}
-            <div>
+            <div onClick={(e) => e.stopPropagation()}>
               <label className="font-mono text-[10px] uppercase tracking-wider text-gray-500">Status</label>
               <div className="flex gap-2 mt-2">
                 {(['owned', 'tried', 'wishlist'] as CellarStatus[]).map((status) => (
@@ -217,7 +211,7 @@ export function CellarBottleCard({ bottle, onUpdate, onRemove }: CellarBottleCar
                         : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                     }`}
                   >
-                    {status}
+                    {status === 'wishlist' ? 'saved' : status}
                   </button>
                 ))}
               </div>

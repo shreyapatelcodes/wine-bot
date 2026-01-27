@@ -2,20 +2,28 @@
  * Modal for adding bottles to cellar
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Search, Wine, Plus, Loader2 } from 'lucide-react';
 import { useWineSearch, useCellar } from '../../hooks';
 import type { Wine as WineType, CellarBottleCreate, WineType as WineTypeValue } from '../../types';
 
+type AddMode = 'search' | 'manual';
+
 interface AddBottleModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialMode?: AddMode;
 }
 
-type AddMode = 'search' | 'manual';
+export function AddBottleModal({ isOpen, onClose, initialMode = 'search' }: AddBottleModalProps) {
+  const [mode, setMode] = useState<AddMode>(initialMode);
 
-export function AddBottleModal({ isOpen, onClose }: AddBottleModalProps) {
-  const [mode, setMode] = useState<AddMode>('search');
+  // Sync mode with initialMode when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode);
+    }
+  }, [isOpen, initialMode]);
   const { query, setQuery, results, isLoading: isSearching } = useWineSearch();
   const { addBottle, isAdding } = useCellar();
 

@@ -3,7 +3,7 @@
  */
 
 import { useState, useRef, type FormEvent, type KeyboardEvent } from 'react';
-import { Send, Loader2, Camera, ArrowRight } from 'lucide-react';
+import { Loader2, Camera, ArrowRight } from 'lucide-react';
 
 interface ChatInputProps {
   onSend: (message: string) => void;

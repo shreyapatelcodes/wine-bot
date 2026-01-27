@@ -2,8 +2,8 @@
  * Cellar management page
  */
 
-import { useState } from 'react';
-import { Plus, Lock, Camera, Search, Sparkles, ArrowRight } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Plus, Lock, Camera, Search, Sparkles, PenLine } from 'lucide-react';
 import { CellarList, AddBottleModal } from '../components/cellar';
 import { LoginModal } from '../components/auth';
 import { ImageUpload } from '../components/shared';
@@ -12,14 +12,40 @@ import { api } from '../services/api';
 import { useCellar } from '../hooks';
 import type { VisionMatchResponse, Wine } from '../types';
 
+type AddMode = 'manual' | 'search';
+
 export function CellarPage() {
   const { isAuthenticated, isLoading } = useAuth();
   const { addBottle } = useCellar();
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [addMode, setAddMode] = useState<AddMode | null>(null);
   const [showScanModal, setShowScanModal] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [scanResult, setScanResult] = useState<VisionMatchResponse | null>(null);
+  const addMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close add menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(event.target as Node)) {
+        setShowAddMenu(false);
+      }
+    };
+    if (showAddMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAddMenu]);
+
+  const handleAddOption = (mode: 'manual' | 'search' | 'scan') => {
+    setShowAddMenu(false);
+    if (mode === 'scan') {
+      setShowScanModal(true);
+    } else {
+      setAddMode(mode);
+    }
+  };
 
   const handleImageScan = async (base64: string) => {
     setIsAnalyzing(true);
@@ -121,47 +147,54 @@ export function CellarPage() {
               A curated collection of your finest acquisitions. Manage your inventory and consult our agent for the perfect pairing.
             </p>
 
-            {/* Action buttons */}
-            <div className="flex flex-wrap gap-3 mt-6">
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                <span className="font-mono text-xs uppercase tracking-wider">Add Bottle</span>
+            {/* Action buttons - inline */}
+            <div className="flex flex-wrap items-center gap-3 mt-6">
+              {/* What should I drink tonight - red filled */}
+              <button className="flex items-center gap-2 px-5 py-2.5 bg-wine-600 text-white rounded-xl hover:bg-wine-700 transition-colors group">
+                <Sparkles className="w-4 h-4" />
+                <span className="font-mono text-xs uppercase tracking-wider">What should I drink tonight?</span>
               </button>
-              <button
-                onClick={() => setShowScanModal(true)}
-                className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
-              >
-                <Camera className="w-4 h-4" />
-                <span className="font-mono text-xs uppercase tracking-wider">Scan Label</span>
-              </button>
-              <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors">
-                <Search className="w-4 h-4" />
-                <span className="font-mono text-xs uppercase tracking-wider">Search Collection</span>
-              </button>
+
+              {/* Add Bottle - outlined */}
+              <div className="relative" ref={addMenuRef}>
+                <button
+                  onClick={() => setShowAddMenu(!showAddMenu)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="font-mono text-xs uppercase tracking-wider">Add Bottle</span>
+                </button>
+
+                {/* Dropdown menu */}
+                {showAddMenu && (
+                  <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
+                    <button
+                      onClick={() => handleAddOption('manual')}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <PenLine className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">Add manually</span>
+                    </button>
+                    <button
+                      onClick={() => handleAddOption('search')}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <Search className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">Search</span>
+                    </button>
+                    <button
+                      onClick={() => handleAddOption('scan')}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <Camera className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">Scan label</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </header>
-
-        {/* AI suggestion banner */}
-        <div className="px-6 md:px-8 mb-6">
-          <div className="max-w-6xl mx-auto">
-            <button className="w-full p-5 bg-gradient-to-r from-wine-600 to-wine-700 text-white rounded-xl flex items-center justify-between group hover:from-wine-700 hover:to-wine-800 transition-all shadow-lg shadow-wine-600/20">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                  <Sparkles className="w-6 h-6" />
-                </div>
-                <div className="text-left">
-                  <h3 className="font-serif italic text-xl">What should I drink tonight?</h3>
-                  <p className="text-wine-100 text-sm mt-1">Get a personalized recommendation from your cellar</p>
-                </div>
-              </div>
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </button>
-          </div>
-        </div>
 
         {/* Cellar content */}
         <div className="px-6 md:px-8 pb-8">
@@ -173,8 +206,9 @@ export function CellarPage() {
 
       {/* Add bottle modal */}
       <AddBottleModal
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
+        isOpen={addMode !== null}
+        onClose={() => setAddMode(null)}
+        initialMode={addMode || 'search'}
       />
 
       {/* Scan label modal */}

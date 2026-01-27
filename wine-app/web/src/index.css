@@ -49,13 +49,6 @@ body {
   @apply font-mono text-xs uppercase tracking-wider text-gray-500;
 }
 
-/* Vertical text rotation for sidebar */
-.vertical-text {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  transform: rotate(180deg);
-}
-
 /* Custom animation delays for typing indicator */
 .animate-bounce {
   animation: bounce 1s infinite;
@@ -68,4 +61,28 @@ body {
   50% {
     transform: translateY(-25%);
   }
+}
+
+/* Bottom sheet slide-up animation */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+/* Safe area padding for bottom sheet */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+/* Safe area padding for mobile nav */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom);
 }

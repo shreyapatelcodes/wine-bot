@@ -2,13 +2,13 @@
  * Wine recommendation card component
  */
 
-import { Bookmark, BookmarkCheck, Wine } from 'lucide-react';
-import type { WineRecommendation } from '../../types';
+import { Bookmark, BookmarkCheck, Wine as WineIcon } from 'lucide-react';
+import type { WineRecommendation, Wine } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 
 interface WineCardProps {
   recommendation: WineRecommendation;
-  onSave?: (wineId: string) => void;
+  onSave?: (wine: Wine) => void;
 }
 
 export function WineCard({ recommendation, onSave }: WineCardProps) {
@@ -35,7 +35,7 @@ export function WineCard({ recommendation, onSave }: WineCardProps) {
       <div className="flex gap-4">
         {/* Wine image placeholder */}
         <div className="w-16 h-24 bg-cream rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
-          <Wine className={`w-8 h-8 ${getWineTypeColor(wine.wine_type)}`} />
+          <WineIcon className={`w-8 h-8 ${getWineTypeColor(wine.wine_type)}`} />
         </div>
 
         <div className="flex-1 min-w-0">
@@ -59,7 +59,7 @@ export function WineCard({ recommendation, onSave }: WineCardProps) {
         {/* Save button */}
         {isAuthenticated && onSave && !is_in_cellar && (
           <button
-            onClick={() => onSave(wine.id)}
+            onClick={() => onSave(wine)}
             className={`self-start p-2 rounded-xl transition-colors ${
               is_saved
                 ? 'bg-wine-100 text-wine-600'

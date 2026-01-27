@@ -2,13 +2,15 @@
  * Main chat container component
  */
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { Trash2 } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { TypingIndicator } from './TypingIndicator';
-import { useChat, useSavedBottles } from '../../hooks';
+import { SavedToast } from '../shared';
+import { useChat, useCellar } from '../../hooks';
 import { useAuth } from '../../context/AuthContext';
+import type { Wine } from '../../types';
 
 const quickSuggestions = [
   'Suggest a 2018 Bordeaux',
@@ -19,25 +21,35 @@ const quickSuggestions = [
 
 export function ChatContainer() {
   const { messages, isLoading, sendMessage, clearChat } = useChat();
-  const { saveBottle } = useSavedBottles();
+  const { addBottle } = useCellar();
   const { isAuthenticated } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showSavedToast, setShowSavedToast] = useState(false);
+  const [savedWineName, setSavedWineName] = useState<string | undefined>();
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSaveWine = async (wineId: string) => {
+  const handleSaveWineClick = useCallback(async (wine: Wine) => {
     if (!isAuthenticated) return;
     try {
-      await saveBottle({ wine_id: wineId });
+      await addBottle({ wine_id: wine.id, status: 'wishlist', quantity: 1 });
+      setSavedWineName(wine.name);
+      setShowSavedToast(true);
     } catch (error) {
       console.error('Failed to save wine:', error);
     }
-  };
+  }, [isAuthenticated, addBottle]);
+
+  const handleToastComplete = useCallback(() => {
+    setShowSavedToast(false);
+    setSavedWineName(undefined);
+  }, []);
 
   return (
+    <>
     <div className="flex flex-col h-full">
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto py-6 space-y-6">
@@ -45,7 +57,7 @@ export function ChatContainer() {
           <ChatMessage
             key={message.id}
             message={message}
-            onSaveWine={handleSaveWine}
+            onSaveWine={handleSaveWineClick}
           />
         ))}
         {isLoading && <TypingIndicator />}
@@ -84,5 +96,13 @@ export function ChatContainer() {
         )}
       </div>
     </div>
+
+    {/* Saved toast notification */}
+    <SavedToast
+      isVisible={showSavedToast}
+      wineName={savedWineName}
+      onComplete={handleToastComplete}
+    />
+    </>
   );
 }
