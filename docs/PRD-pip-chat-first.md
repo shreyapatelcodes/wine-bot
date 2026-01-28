@@ -246,6 +246,108 @@ Pip can do 9 things. Everything flows through chat.
 
 ---
 
+## Conversation UX Requirements
+
+For an agentic shopping experience to feel natural, these conversation behaviors are essential.
+
+### Must-Have (POC)
+
+#### 1. Multi-Turn Context
+Pip maintains context across multiple messages within a session.
+
+| Conversation | How Pip handles it |
+|--------------|-------------------|
+| "Recommend something" → "For what occasion?" → "Steak dinner" | Pip remembers the original request and combines with new info |
+| "Show me my cellar" → "Any whites?" | Pip understands "whites" refers to filtering the cellar just shown |
+| "Tell me about the second one" | Pip knows which wine was "second" in the previous list |
+
+**Implementation:** Include last N messages (suggest N=10) as context in each request.
+
+#### 2. Ambiguity Handling
+When unclear, Pip asks instead of guessing wrong.
+
+| Ambiguous input | Pip's response |
+|-----------------|----------------|
+| "Add this to my cellar" (3 wines shown) | "Which one — the Malbec, the Pinot, or the Cab?" |
+| "Rate it 4 stars" (no recent wine context) | "Which wine are you rating?" |
+| "Something cheap" (unclear threshold) | "What's your budget? Under $20? $30?" |
+
+**Principle:** A clarifying question is better than a wrong action.
+
+#### 3. Undo and Correction
+Users can reverse actions and correct Pip's understanding.
+
+| User says | Pip's response |
+|-----------|----------------|
+| "Actually, make that 3 stars not 4" | "Updated to 3 stars." |
+| "Nevermind, don't add that" | "No problem, I won't add it." |
+| "Remove that from my cellar" | "Are you sure you want to remove [wine]?" (confirm destructive action) |
+| "No, I meant the Pinot not the Malbec" | "Got it — switching to the Pinot." |
+
+**Principle:** Trust requires reversibility.
+
+#### 4. Typing/Thinking Indicator
+User sees feedback that Pip is processing their request.
+
+- Show a typing indicator or "Pip is thinking..." state
+- Appears immediately after user sends message
+- Disappears when response arrives
+
+**Why it matters:** 3-5 second LLM latency feels broken without feedback.
+
+#### 5. First-Run Experience
+New users get guided onboarding, not a blank chat.
+
+```
+User opens app for first time
+→ Pip: "Hey! I'm Pip, your personal wine guide. I can help you discover
+   wines you'll love, remember what you've tried, and learn as you go.
+
+   What sounds good right now?"
+
+   [Recommend something] [I have a question] [Show me how this works]
+```
+
+- Quick action buttons lower the barrier to first interaction
+- Pip adapts to whatever the user picks
+- No mandatory onboarding quiz — learn through conversation
+
+### Should-Have (Polish)
+
+#### 6. Streaming Responses
+Text appears progressively as it's generated.
+
+- Reduces perceived latency
+- Feels more conversational (like watching someone type)
+- Cards can appear after text completes
+
+**Trade-off:** Adds implementation complexity. Acceptable to defer for POC but strongly improves feel.
+
+#### 7. Confirmation for Destructive Actions
+Pip confirms before irreversible changes.
+
+| Action | Confirmation |
+|--------|--------------|
+| Remove from cellar | "Remove [wine] from your cellar? This can't be undone." [Yes] [No] |
+| Clear all ratings | "This will clear your taste profile. Are you sure?" [Yes] [No] |
+| Delete account | Requires explicit confirmation |
+
+**Non-destructive actions (add, rate) can happen immediately** with ability to undo.
+
+#### 8. Smart Photo Retry
+When photo analysis fails, guide the user to success.
+
+| Failure mode | Pip's response |
+|--------------|----------------|
+| Blurry image | "I can't quite read the label — it's a bit blurry. Try holding your phone steady and getting closer?" |
+| Back of bottle | "I can see the back label, but I need the front to identify the wine. Can you flip it around?" |
+| Not a wine | "That doesn't look like a wine bottle to me. Were you trying to show me something else?" |
+| Partial success | "I can see this is a 2019 red from France, but I can't read the producer. Do you know the name?" |
+
+**Principle:** Failed photo shouldn't be a dead end.
+
+---
+
 ## User Flows
 
 ### Flow 1: First-time user
@@ -319,11 +421,21 @@ User: "Why is that Burgundy you recommended so expensive?"
 - Implicit profile building from ratings
 - Vivino links for purchase
 - Photo analysis for bottle identification
+- **Multi-turn context** (last N messages inform each request)
+- **Ambiguity handling** (ask clarifying questions vs. guess wrong)
+- **Undo/correction support** ("actually...", "nevermind")
+- **Typing/thinking indicator** (feedback during LLM processing)
+- **First-run experience** (guided onboarding with quick actions)
+- **Confirmation for destructive actions** (remove from cellar, etc.)
+- **Smart photo retry** (guide user when photo analysis fails)
+
+### Should-have (if time permits)
+- **Streaming responses** (text appears as generated)
 
 ### Out of scope (POC)
-- Proactive follow-up questions from Pip
+- Proactive outreach ("Hey, that winery you liked released something new...")
 - Periodic check-ins ("You've tried 5 wines this month...")
-- Conversation memory beyond preferences
+- Conversation persistence across sessions (beyond preferences)
 - Social features (sharing, friends)
 - Multiple purchase integrations (just Vivino for now)
 - Push notifications
@@ -333,9 +445,10 @@ User: "Why is that Burgundy you recommended so expensive?"
 
 ## Open Questions
 
-1. **Onboarding:** Should Pip ask preference questions upfront, or learn purely through usage?
-2. **Conversation persistence:** Should users see past conversations, or just current session?
+1. ~~**Onboarding:** Should Pip ask preference questions upfront, or learn purely through usage?~~ **Decided:** First-run experience with guided quick actions, then learn through usage.
+2. **Conversation persistence:** Should users see past conversations, or just current session? (Leaning toward: current session only for POC, preferences persist)
 3. **Cellar view:** Is the in-chat card view sufficient, or do some users need a dedicated browse view?
+4. **Multi-turn context depth:** How many messages to include? (Suggest: 10)
 
 ---
 

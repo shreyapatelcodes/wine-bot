@@ -633,29 +633,41 @@ Replaces direct calls to /recommendations, /cellar, etc. with a unified chat end
 
 ```python
 @app.route("/api/v1/chat", methods=["POST"])
-@jwt_required()
+@jwt_required(optional=True)  # Allow anonymous for recommendations, require auth for cellar ops
 def chat():
-    user_id = get_jwt_identity()
+    user_id = get_jwt_identity()  # May be None for anonymous
     data = request.json
 
     message = data.get("message", "")
     attachments = data.get("attachments", [])  # Base64 images
+    conversation_history = data.get("history", [])  # Last N messages for context
 
     orchestrator = ChatOrchestrator()
-    response = orchestrator.process(message, user_id, attachments)
+    response = orchestrator.process(
+        message=message,
+        user_id=user_id,
+        attachments=attachments,
+        history=conversation_history  # For multi-turn context
+    )
 
     return jsonify({
         "message": response.message,
         "cards": [card.to_dict() for card in response.cards],
-        "actions": response.suggested_actions,  # e.g., ["Save to cellar", "Tell me more"]
+        "actions": response.suggested_actions,
+        "requires_auth": response.requires_auth,  # True if action needs login
+        "confirmation": response.confirmation,  # For destructive actions
     })
 ```
 
 **Request:**
 ```json
 {
-    "message": "Red wine under $40 for steak",
-    "attachments": []
+    "message": "Tell me more about the second one",
+    "attachments": [],
+    "history": [
+        {"role": "user", "content": "Red wine under $40 for steak"},
+        {"role": "assistant", "content": "Here are two great options...", "cards": [{"id": "wine-1", ...}, {"id": "wine-2", ...}]}
+    ]
 }
 ```
 
@@ -670,7 +682,24 @@ def chat():
             "explanation": "This Malbec has bold fruit and soft tannins..."
         }
     ],
-    "actions": ["Save to cellar", "Find more options"]
+    "actions": ["Save to cellar", "Find more options"],
+    "requires_auth": false,
+    "confirmation": null
+}
+```
+
+**Response requiring confirmation:**
+```json
+{
+    "message": "Remove the 2019 Malbec from your cellar?",
+    "cards": [],
+    "actions": ["Yes, remove it", "No, keep it"],
+    "requires_auth": true,
+    "confirmation": {
+        "action": "cellar_remove",
+        "target_id": "bottle-123",
+        "destructive": true
+    }
 }
 ```
 
@@ -745,6 +774,414 @@ interface Card {
 
 ---
 
+## Conversation UX Implementation
+
+### 1. Multi-Turn Context
+
+**Frontend responsibility:** Send last N messages with each request.
+
+```typescript
+const MAX_HISTORY_MESSAGES = 10;
+
+function sendMessage(message: string) {
+  const history = messages.slice(-MAX_HISTORY_MESSAGES).map(m => ({
+    role: m.role,
+    content: m.content,
+    cards: m.cards?.map(c => ({ id: c.data.id, type: c.type, name: c.data.name }))
+  }));
+
+  return api.post('/chat', { message, history, attachments });
+}
+```
+
+**Backend responsibility:** Use history for context resolution.
+
+```python
+class ChatOrchestrator:
+    def process(self, message: str, user_id: str, attachments: list, history: list) -> ChatResponse:
+        # Include history in intent classification for context
+        intent = self.intent_classifier.classify(
+            message=message,
+            attachments=attachments,
+            history=history  # Helps resolve "the second one", "that wine", etc.
+        )
+
+        # If intent references previous items, resolve them
+        if intent.has_reference:
+            intent.resolved_items = self._resolve_references(intent, history)
+
+        # Route to agent with full context
+        return self._route_to_agent(intent, user_id, history)
+```
+
+**Reference resolution examples:**
+
+| User says | History contains | Resolved to |
+|-----------|------------------|-------------|
+| "the second one" | 2 wine cards | wine cards[1] |
+| "that Malbec" | 1 Malbec in cards | that specific wine |
+| "add it" | 1 wine discussed | that wine |
+| "both of them" | 2 wines shown | both wines |
+
+### 2. Ambiguity Handling
+
+**Intent classifier returns confidence + ambiguity flag:**
+
+```python
+class IntentClassification(BaseModel):
+    type: str  # recommend, rate, cellar_add, etc.
+    confidence: float  # 0-1
+    is_ambiguous: bool
+    ambiguity_reason: str | None  # "multiple_wines", "unclear_target", etc.
+    clarifying_question: str | None  # Pre-generated question to ask
+
+INTENT_CLASSIFICATION_PROMPT = """
+Classify the user's intent. If the intent is unclear or could apply to multiple items, mark as ambiguous.
+
+Return JSON:
+{
+    "type": "...",
+    "confidence": 0.0-1.0,
+    "is_ambiguous": true/false,
+    "ambiguity_reason": "multiple_wines" | "unclear_rating" | "vague_criteria" | null,
+    "clarifying_question": "Which wine..." | null,
+    "extracted_entities": {...}
+}
+
+User message: {message}
+Conversation history: {history}
+"""
+```
+
+**Orchestrator handles ambiguity:**
+
+```python
+def process(self, message, user_id, attachments, history):
+    intent = self.intent_classifier.classify(message, attachments, history)
+
+    if intent.is_ambiguous:
+        return ChatResponse(
+            message=intent.clarifying_question,
+            cards=[],
+            actions=self._generate_disambiguation_options(intent, history)
+        )
+
+    # Proceed with clear intent
+    return self._route_to_agent(intent, user_id, history)
+```
+
+### 3. Undo and Correction
+
+**Pattern matching for corrections:**
+
+```python
+CORRECTION_PATTERNS = [
+    r"actually[,]? (?:make that|change that to|I meant)",
+    r"no[,]? (?:I meant|not that|the other)",
+    r"nevermind|never mind|cancel that",
+    r"undo|remove that|take that back",
+]
+
+class IntentClassifier:
+    def classify(self, message, attachments, history):
+        # Check for correction intent first
+        if self._is_correction(message):
+            return self._classify_correction(message, history)
+
+        # Normal classification
+        ...
+
+    def _classify_correction(self, message, history):
+        # Find the last action taken
+        last_action = self._find_last_action(history)
+
+        return IntentClassification(
+            type="correction",
+            correction_target=last_action,
+            correction_type=self._parse_correction_type(message),  # "change_value", "undo", "switch_target"
+        )
+```
+
+**Correction agent:**
+
+```python
+class CorrectionAgent:
+    def handle(self, intent: IntentClassification, user_id: str) -> ChatResponse:
+        match intent.correction_type:
+            case "undo":
+                return self._undo_last_action(intent.correction_target, user_id)
+            case "change_value":
+                return self._update_value(intent.correction_target, intent.new_value, user_id)
+            case "switch_target":
+                return self._switch_target(intent.correction_target, intent.new_target, user_id)
+```
+
+### 4. Typing/Thinking Indicator
+
+**Frontend implementation:**
+
+```typescript
+function ChatContainer() {
+  const [isLoading, setIsLoading] = useState(false);
+
+  async function sendMessage(message: string) {
+    setIsLoading(true);  // Show indicator immediately
+
+    try {
+      const response = await api.post('/chat', { message, history });
+      addMessage({ role: 'assistant', ...response });
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <div>
+      <MessageList messages={messages} />
+      {isLoading && <TypingIndicator />}  {/* "Pip is thinking..." */}
+      <InputArea onSend={sendMessage} disabled={isLoading} />
+    </div>
+  );
+}
+
+function TypingIndicator() {
+  return (
+    <div className="flex items-center gap-2 text-gray-500 p-4">
+      <div className="typing-dots">  {/* Animated dots */}
+        <span /><span /><span />
+      </div>
+      <span>Pip is thinking...</span>
+    </div>
+  );
+}
+```
+
+### 5. First-Run Experience
+
+**Backend: Check if user is new:**
+
+```python
+@app.route("/api/v1/chat", methods=["POST"])
+def chat():
+    user_id = get_jwt_identity()
+    data = request.json
+
+    # Check if this is first message (no history, new or anonymous user)
+    is_first_message = not data.get("history") and not data.get("message")
+
+    if is_first_message:
+        return jsonify({
+            "message": get_welcome_message(user_id),
+            "cards": [],
+            "actions": ["Recommend something", "I have a question", "Show me how this works"],
+            "is_onboarding": True
+        })
+
+    # Normal flow
+    ...
+
+def get_welcome_message(user_id: str | None) -> str:
+    if user_id:
+        user = User.query.get(user_id)
+        if user and user.profile and user.profile.total_ratings > 0:
+            return f"Welcome back! Ready to explore more wines?"
+
+    return """Hey! I'm Pip, your personal wine guide.
+
+I can help you discover wines you'll love, remember what you've tried, and learn as you go.
+
+What sounds good right now?"""
+```
+
+**Frontend: Render quick action buttons:**
+
+```typescript
+function QuickActions({ actions, onSelect }: { actions: string[], onSelect: (action: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2 p-4">
+      {actions.map(action => (
+        <button
+          key={action}
+          onClick={() => onSelect(action)}
+          className="px-4 py-2 bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200"
+        >
+          {action}
+        </button>
+      ))}
+    </div>
+  );
+}
+```
+
+### 6. Confirmation for Destructive Actions
+
+**Backend returns confirmation request:**
+
+```python
+class CellarAgent:
+    def remove(self, intent: Intent, user_id: str) -> ChatResponse:
+        bottle = self._resolve_bottle(intent, user_id)
+
+        # Don't execute yet - ask for confirmation
+        return ChatResponse(
+            message=f"Remove {bottle.wine.name} from your cellar? This can't be undone.",
+            cards=[CellarCard(bottle)],
+            actions=["Yes, remove it", "No, keep it"],
+            confirmation=ConfirmationRequest(
+                action="cellar_remove",
+                target_id=str(bottle.id),
+                destructive=True
+            )
+        )
+
+    def confirm_remove(self, bottle_id: str, user_id: str) -> ChatResponse:
+        # Actually execute the removal
+        bottle = CellarBottle.query.get(bottle_id)
+        db.session.delete(bottle)
+        db.session.commit()
+
+        return ChatResponse(
+            message=f"Done — {bottle.wine.name} has been removed from your cellar.",
+            cards=[]
+        )
+```
+
+**Frontend handles confirmation:**
+
+```typescript
+function handleResponse(response: ChatResponse) {
+  if (response.confirmation?.destructive) {
+    // Store pending confirmation
+    setPendingConfirmation(response.confirmation);
+  }
+
+  addMessage({ role: 'assistant', ...response });
+}
+
+function handleQuickAction(action: string) {
+  if (pendingConfirmation && action === "Yes, remove it") {
+    // Send confirmation
+    api.post('/chat', {
+      message: action,
+      confirmation: pendingConfirmation
+    });
+    setPendingConfirmation(null);
+  } else {
+    // Normal message
+    sendMessage(action);
+  }
+}
+```
+
+### 7. Smart Photo Retry
+
+**Vision agent returns guidance on failure:**
+
+```python
+class PhotoAgent:
+    def handle(self, attachments: list, user_id: str) -> ChatResponse:
+        if not attachments:
+            return ChatResponse(
+                message="I don't see a photo. Tap the camera icon to take one!",
+                cards=[]
+            )
+
+        analysis = self.vision_service.analyze(attachments[0])
+
+        if analysis.confidence < 0.3:
+            return self._suggest_retry(analysis)
+
+        if analysis.confidence < 0.7:
+            return self._partial_match(analysis, user_id)
+
+        return self._full_match(analysis, user_id)
+
+    def _suggest_retry(self, analysis: VisionAnalysis) -> ChatResponse:
+        # Determine why it failed and give specific guidance
+        if analysis.failure_reason == "blurry":
+            message = "I can't quite read the label — it's a bit blurry. Try holding your phone steady and getting closer to the label?"
+        elif analysis.failure_reason == "wrong_side":
+            message = "I can see the back label, but I need the front to identify the wine. Can you flip it around?"
+        elif analysis.failure_reason == "not_wine":
+            message = "That doesn't look like a wine bottle to me. Were you trying to show me something else?"
+        elif analysis.failure_reason == "obscured":
+            message = "Part of the label is covered. Can you show me the full front label?"
+        else:
+            message = "I'm having trouble reading this label. Can you try another photo with better lighting?"
+
+        return ChatResponse(
+            message=message,
+            cards=[],
+            actions=["Try another photo", "Type the wine name instead"]
+        )
+
+    def _partial_match(self, analysis: VisionAnalysis, user_id: str) -> ChatResponse:
+        # We got some info but not everything
+        partial_info = []
+        if analysis.vintage:
+            partial_info.append(f"a {analysis.vintage}")
+        if analysis.wine_type:
+            partial_info.append(analysis.wine_type)
+        if analysis.country:
+            partial_info.append(f"from {analysis.country}")
+
+        info_str = " ".join(partial_info) if partial_info else "a wine"
+
+        return ChatResponse(
+            message=f"I can see this is {info_str}, but I can't read the producer name. Do you know what it's called?",
+            cards=[],
+            actions=["Try another photo"]
+        )
+```
+
+### 8. Streaming Responses (Should-Have)
+
+**If implemented, use Server-Sent Events:**
+
+```python
+@app.route("/api/v1/chat/stream", methods=["POST"])
+def chat_stream():
+    def generate():
+        for chunk in orchestrator.process_streaming(message, user_id, history):
+            yield f"data: {json.dumps(chunk)}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream')
+```
+
+```typescript
+async function sendMessageStreaming(message: string) {
+  const response = await fetch('/api/v1/chat/stream', {
+    method: 'POST',
+    body: JSON.stringify({ message, history }),
+  });
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+
+  let assistantMessage = { role: 'assistant', content: '', cards: [] };
+  addMessage(assistantMessage);
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunk = JSON.parse(decoder.decode(value).replace('data: ', ''));
+
+    if (chunk.type === 'text') {
+      assistantMessage.content += chunk.content;
+      updateLastMessage(assistantMessage);
+    } else if (chunk.type === 'cards') {
+      assistantMessage.cards = chunk.cards;
+      updateLastMessage(assistantMessage);
+    }
+  }
+}
+```
+
+**Note:** Streaming adds complexity. Acceptable to defer for POC and use loading indicator instead.
+
+---
+
 ## Migration Path
 
 ### Phase 1: Backend Extensions
@@ -752,25 +1189,35 @@ interface Card {
 2. Add NLP extraction to PreferenceInterpreter
 3. Fix explanation attribution (separate user_request from category_knowledge in SearchQuery)
 4. Add EducationAgent
-5. Add CellarAgent
+5. Add CellarAgent (with confirmation flow for destructive actions)
 6. Add ProfileService and ProfileAgent
 7. Add DecideAgent
-8. Add POST /api/v1/chat endpoint
-9. Add UserProfile table migration
+8. Add CorrectionAgent (undo/correction support)
+9. Add POST /api/v1/chat endpoint (with history parameter)
+10. Add UserProfile table migration
+11. Add ambiguity detection to intent classifier
+12. Add smart retry logic to PhotoAgent
 
 ### Phase 2: Frontend Rebuild
 1. Build new ChatContainer with card rendering
 2. Build card components (CellarCard, ProfileCard)
 3. Build action buttons and photo capture
-4. Remove old pages (CellarPage, WineDetailPage, SavedPage)
-5. Update routing to single ChatPage
+4. Add typing/thinking indicator
+5. Add first-run experience with quick actions
+6. Add confirmation dialog handling for destructive actions
+7. Implement conversation history management (last N messages)
+8. Remove old pages (CellarPage, WineDetailPage, SavedPage)
+9. Update routing to single ChatPage
 
 ### Phase 3: Integration & Polish
 1. Connect frontend to new /chat endpoint
 2. Test all 9 capabilities
-3. Refine intent classification prompts
-4. Add error handling for edge cases
-5. Polish card UI and transitions
+3. Test conversation UX flows (multi-turn, ambiguity, correction, confirmation)
+4. Refine intent classification prompts
+5. Refine ambiguity detection and clarifying questions
+6. Add error handling for edge cases
+7. Polish card UI and transitions
+8. (Optional) Add streaming responses
 
 ---
 
@@ -778,11 +1225,13 @@ interface Card {
 
 1. **LLM choice for intent classification:** Use same model as recommendations (GPT-4) or faster/cheaper model for classification step?
 
-2. **Conversation context:** How much history to include in each request? Full session or last N messages?
+2. ~~**Conversation context:** How much history to include in each request? Full session or last N messages?~~ **Decided:** Last 10 messages.
 
 3. **Card rendering:** Should cards be embedded in messages or rendered separately in a fixed area?
 
-4. **Offline/optimistic updates:** Should "add to cellar" update UI immediately or wait for server confirmation?
+4. **Offline/optimistic updates:** Should "add to cellar" update UI immediately or wait for server confirmation? (Suggest: optimistic update with rollback on failure)
+
+5. **Correction scope:** How far back can user correct? Just the last action, or any action in history?
 
 ---
 
@@ -790,18 +1239,32 @@ interface Card {
 
 | Risk | Mitigation |
 |------|------------|
-| Intent classification errors | Include "unclear" intent with clarifying question fallback |
-| LLM latency for every message | Consider classification-only for simple intents, skip LLM for direct commands |
+| Intent classification errors | Include "unclear" intent with clarifying question fallback; ambiguity detection |
+| LLM latency for every message | Consider classification-only for simple intents, skip LLM for direct commands; typing indicator provides feedback |
 | Profile building takes time | Set expectations in UI ("I'm still learning your taste") |
 | Scope creep | Strict POC scope — defer streaming, persistence, notifications |
+| Multi-turn context bloat | Limit to last 10 messages; summarize cards to IDs only |
+| Correction complexity | Start with last-action-only corrections; expand scope later if needed |
+| Photo retry frustration | Specific guidance based on failure reason; offer "type name instead" escape hatch |
+| Confirmation fatigue | Only confirm destructive actions; non-destructive actions (add, rate) are immediate with undo option |
 
 ---
 
 ## Success Criteria
 
+### Core Capabilities
 1. User can complete all 9 capabilities without leaving chat
 2. "Under $40 California red" returns wines matching those filters
 3. Rating a wine updates profile (visible when asking "what do I like?")
 4. Empty states are handled gracefully
 5. Off-topic questions redirect politely
 6. Explanations only attribute preferences user actually expressed (no fabricated preferences)
+
+### Conversation UX
+7. Multi-turn context works: "tell me about the second one" resolves correctly
+8. Ambiguous requests trigger clarifying questions, not wrong actions
+9. User can undo/correct: "actually, make that 3 stars" works
+10. Typing indicator appears immediately when user sends a message
+11. First-time users see welcome message with quick action buttons
+12. Destructive actions (remove from cellar) require confirmation
+13. Failed photo analysis provides actionable guidance for retry
