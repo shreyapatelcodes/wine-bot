@@ -69,7 +69,6 @@ export function useCellarStats() {
     total: bottles.length,
     owned: bottles.filter(b => b.status === 'owned').length,
     tried: bottles.filter(b => b.status === 'tried').length,
-    wishlist: bottles.filter(b => b.status === 'wishlist').length,
     totalBottles: bottles.filter(b => b.status === 'owned').reduce((sum, b) => sum + b.quantity, 0),
   };
 }

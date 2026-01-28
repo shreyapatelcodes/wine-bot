@@ -120,7 +120,7 @@ class CellarBottleCreate(BaseModel):
     custom_wine_metadata: Optional[dict] = None
 
     # Cellar info
-    status: Literal["owned", "tried", "wishlist"] = "owned"
+    status: Literal["owned", "tried"] = "owned"
     quantity: int = 1
     purchase_date: Optional[datetime] = None
     purchase_price: Optional[float] = None
@@ -133,7 +133,7 @@ class CellarBottleCreate(BaseModel):
 
 class CellarBottleUpdate(BaseModel):
     """Request body for updating a cellar bottle."""
-    status: Optional[Literal["owned", "tried", "wishlist"]] = None
+    status: Optional[Literal["owned", "tried"]] = None
     quantity: Optional[int] = None
     rating: Optional[float] = Field(None, ge=1, le=5)
     tasting_notes: Optional[str] = None
@@ -221,3 +221,65 @@ class VisionMatchResponse(BaseModel):
     analysis: VisionAnalyzeResponse
     matches: list[WineSearchResult]
     best_match: Optional[WineBase]
+
+
+# ============== Chat Schemas ==============
+
+class ChatAction(BaseModel):
+    """Action button for chat responses."""
+    type: str = Field(..., description="Action type (save, add_cellar, tell_more, etc.)")
+    label: str = Field(..., description="Display label for the action")
+    data: Optional[dict] = Field(None, description="Additional data for the action")
+
+
+class ChatRequest(BaseModel):
+    """Request body for chat endpoint."""
+    message: str = Field(..., description="User's message")
+    session_id: Optional[str] = Field(None, description="Existing session ID for conversation continuity")
+    image_base64: Optional[str] = Field(None, description="Base64-encoded image for label scanning")
+    history: Optional[list[dict]] = Field(None, description="Optional message history from client")
+
+
+class ChatCard(BaseModel):
+    """Card to display in chat (wine recommendation, cellar item, etc.)."""
+    type: str = Field(..., description="Card type: wine, cellar, identified_wine")
+    wine_id: Optional[str] = None
+    bottle_id: Optional[str] = None
+    wine_name: Optional[str] = None
+    producer: Optional[str] = None
+    vintage: Optional[int] = None
+    wine_type: Optional[str] = None
+    varietal: Optional[str] = None
+    region: Optional[str] = None
+    country: Optional[str] = None
+    price_usd: Optional[float] = None
+    explanation: Optional[str] = None
+    relevance_score: Optional[float] = None
+    is_saved: Optional[bool] = None
+    is_in_cellar: Optional[bool] = None
+    status: Optional[str] = None
+    quantity: Optional[int] = None
+    rating: Optional[float] = None
+    confidence: Optional[float] = None
+
+
+class ChatResponse(BaseModel):
+    """Response from chat endpoint."""
+    response: str = Field(..., description="Pip's response text")
+    intent: str = Field(..., description="Classified intent type")
+    session_id: str = Field(..., description="Session ID for continuity")
+    cards: list[ChatCard] = Field(default_factory=list, description="Wine/cellar cards to display")
+    actions: list[ChatAction] = Field(default_factory=list, description="Quick action buttons")
+    requires_auth: bool = Field(False, description="Whether the action requires authentication")
+    requires_clarification: bool = Field(False, description="Whether clarification is needed")
+    confirmation_required: bool = Field(False, description="Whether user confirmation is needed")
+    error: Optional[str] = Field(None, description="Error message if any")
+
+
+class IntentResult(BaseModel):
+    """Result of intent classification (internal use)."""
+    intent: str
+    confidence: float
+    requires_clarification: bool = False
+    clarification_reason: Optional[str] = None
+    entities: dict = Field(default_factory=dict)

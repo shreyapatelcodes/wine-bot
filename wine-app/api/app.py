@@ -40,6 +40,10 @@ from models.schemas import (
     VisionMatchResponse,
     WineSearchResult,
     WineBase,
+    ChatRequest,
+    ChatResponse,
+    ChatCard,
+    ChatAction,
 )
 
 # Wine recommender path for lazy loading
@@ -56,11 +60,12 @@ def _get_recommender():
 
         # Save current modules that might conflict
         saved_modules = {}
+        conflicting_prefixes = ['models', 'config', 'agents', 'utils']
         for mod_name in list(sys.modules.keys()):
-            if mod_name == 'models' or mod_name.startswith('models.'):
-                saved_modules[mod_name] = sys.modules.pop(mod_name)
-            if mod_name == 'config' or mod_name.startswith('config.'):
-                saved_modules[mod_name] = sys.modules.pop(mod_name)
+            for prefix in conflicting_prefixes:
+                if mod_name == prefix or mod_name.startswith(prefix + '.'):
+                    saved_modules[mod_name] = sys.modules.pop(mod_name)
+                    break
 
         # Add wine-recommender to path
         sys.path.insert(0, str(_wine_recommender_path))
@@ -81,6 +86,99 @@ def _get_recommender():
                 sys.modules[mod_name] = mod
 
     return _recommender_engine, _recommender_prefs_class
+
+
+def _analyze_wine_image(image_base64: str) -> dict:
+    """
+    Analyze a wine label image using OpenAI Vision API.
+    Returns extracted wine information.
+    """
+    client = OpenAI(api_key=Config.OPENAI_API_KEY)
+
+    # Clean up base64 string - remove data URL prefix if present
+    if "," in image_base64:
+        image_base64 = image_base64.split(",")[1]
+
+    # Detect image type from base64 or default to jpeg
+    image_type = "jpeg"
+    if image_base64.startswith("/9j/"):
+        image_type = "jpeg"
+    elif image_base64.startswith("iVBOR"):
+        image_type = "png"
+
+    prompt = """Analyze this wine label image and extract the following information.
+Return ONLY a valid JSON object with these fields (use null for any field you cannot determine):
+
+{
+    "name": "the wine name",
+    "producer": "the winery/producer name",
+    "vintage": 2020,
+    "wine_type": "red, white, rosé, or sparkling",
+    "varietal": "the grape variety (e.g., Cabernet Sauvignon, Chardonnay)",
+    "region": "the wine region (e.g., Napa Valley, Bordeaux)",
+    "country": "the country of origin",
+    "additional_info": "any other notable details from the label",
+    "confidence": 0.85
+}
+
+The confidence should be a number between 0 and 1 indicating how confident you are in the extraction.
+If this is not a wine label or you cannot extract wine information, return:
+{"name": null, "producer": null, "vintage": null, "wine_type": null, "varietal": null, "region": null, "country": null, "additional_info": "Unable to identify wine from image", "confidence": 0}"""
+
+    try:
+        response = client.chat.completions.create(
+            model=Config.OPENAI_VISION_MODEL,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/{image_type};base64,{image_base64}",
+                                "detail": "high"
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens=500,
+        )
+
+        # Parse the JSON response
+        content = response.choices[0].message.content.strip()
+
+        # Try to extract JSON from the response (handle markdown code blocks)
+        json_match = re.search(r'\{[\s\S]*\}', content)
+        if json_match:
+            result = json.loads(json_match.group())
+            return result
+        else:
+            return {
+                "name": None,
+                "producer": None,
+                "vintage": None,
+                "wine_type": None,
+                "varietal": None,
+                "region": None,
+                "country": None,
+                "additional_info": "Failed to parse vision response",
+                "confidence": 0
+            }
+
+    except Exception as e:
+        return {
+            "name": None,
+            "producer": None,
+            "vintage": None,
+            "wine_type": None,
+            "varietal": None,
+            "region": None,
+            "country": None,
+            "additional_info": f"Vision API error: {str(e)}",
+            "confidence": 0
+        }
 
 
 def create_app():
@@ -637,99 +735,63 @@ def create_app():
             "count": len(response_recs),
         })
 
-    # ============== Vision Endpoints ==============
+    # ============== Chat Endpoint ==============
 
-    def _analyze_wine_image(image_base64: str) -> dict:
+    @app.route("/api/v1/chat", methods=["POST"])
+    @jwt_optional
+    def chat():
         """
-        Analyze a wine label image using OpenAI Vision API.
-        Returns extracted wine information.
+        Main chat endpoint for Pip wine assistant.
+        Handles all conversation types: recommendations, education, cellar management, etc.
         """
-        client = OpenAI(api_key=Config.OPENAI_API_KEY)
+        try:
+            data = ChatRequest(**request.json)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 400
 
-        # Clean up base64 string - remove data URL prefix if present
-        if "," in image_base64:
-            image_base64 = image_base64.split(",")[1]
+        # Import orchestrator here to avoid circular imports
+        from agents.orchestrator import ChatOrchestrator
 
-        # Detect image type from base64 or default to jpeg
-        image_type = "jpeg"
-        if image_base64.startswith("/9j/"):
-            image_type = "jpeg"
-        elif image_base64.startswith("iVBOR"):
-            image_type = "png"
+        user = getattr(g, 'current_user', None)
+        db = g.db
 
-        prompt = """Analyze this wine label image and extract the following information.
-Return ONLY a valid JSON object with these fields (use null for any field you cannot determine):
-
-{
-    "name": "the wine name",
-    "producer": "the winery/producer name",
-    "vintage": 2020,
-    "wine_type": "red, white, rosé, or sparkling",
-    "varietal": "the grape variety (e.g., Cabernet Sauvignon, Chardonnay)",
-    "region": "the wine region (e.g., Napa Valley, Bordeaux)",
-    "country": "the country of origin",
-    "additional_info": "any other notable details from the label",
-    "confidence": 0.85
-}
-
-The confidence should be a number between 0 and 1 indicating how confident you are in the extraction.
-If this is not a wine label or you cannot extract wine information, return:
-{"name": null, "producer": null, "vintage": null, "wine_type": null, "varietal": null, "region": null, "country": null, "additional_info": "Unable to identify wine from image", "confidence": 0}"""
+        orchestrator = ChatOrchestrator(db=db, user=user)
 
         try:
-            response = client.chat.completions.create(
-                model=Config.OPENAI_VISION_MODEL,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/{image_type};base64,{image_base64}",
-                                    "detail": "high"
-                                }
-                            }
-                        ]
-                    }
-                ],
-                max_tokens=500,
+            result = orchestrator.process_message(
+                message=data.message,
+                session_id=data.session_id,
+                image_base64=data.image_base64,
+                history=data.history
             )
-
-            # Parse the JSON response
-            content = response.choices[0].message.content.strip()
-
-            # Try to extract JSON from the response (handle markdown code blocks)
-            json_match = re.search(r'\{[\s\S]*\}', content)
-            if json_match:
-                result = json.loads(json_match.group())
-                return result
-            else:
-                return {
-                    "name": None,
-                    "producer": None,
-                    "vintage": None,
-                    "wine_type": None,
-                    "varietal": None,
-                    "region": None,
-                    "country": None,
-                    "additional_info": "Failed to parse vision response",
-                    "confidence": 0
-                }
-
         except Exception as e:
-            return {
-                "name": None,
-                "producer": None,
-                "vintage": None,
-                "wine_type": None,
-                "varietal": None,
-                "region": None,
-                "country": None,
-                "additional_info": f"Vision API error: {str(e)}",
-                "confidence": 0
-            }
+            print(f"Chat orchestrator error: {e}")
+            return jsonify({
+                "response": "I'm having trouble right now. Please try again.",
+                "intent": "error",
+                "session_id": data.session_id or "",
+                "cards": [],
+                "actions": [],
+                "requires_auth": False,
+                "error": str(e)
+            }), 500
+
+        # Build response with proper schema validation
+        response = ChatResponse(
+            response=result["response"],
+            intent=result["intent"],
+            session_id=result["session_id"],
+            cards=[ChatCard(**card) for card in result.get("cards", [])],
+            actions=[ChatAction(**action) for action in result.get("actions", [])],
+            requires_auth=result.get("requires_auth", False),
+            requires_clarification=result.get("requires_clarification", False),
+            confirmation_required=result.get("confirmation_required", False),
+            error=result.get("error")
+        )
+
+        return jsonify(response.model_dump(mode="json"))
+
+    # ============== Vision Endpoints ==============
 
     @app.route("/api/v1/vision/analyze", methods=["POST"])
     @jwt_required

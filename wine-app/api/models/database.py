@@ -280,6 +280,57 @@ class ChatMessage(Base):
     )
 
 
+class UserTasteProfile(Base):
+    """
+    User taste profile derived from ratings and interactions.
+    Used for personalized recommendations.
+    """
+
+    __tablename__ = "user_taste_profiles"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+
+    # Preferred wine types (weighted by ratings)
+    preferred_types: Mapped[Optional[dict]] = mapped_column(JSONB)  # {"red": 0.7, "white": 0.3}
+
+    # Preferred regions/countries
+    preferred_regions: Mapped[Optional[list]] = mapped_column(JSONB)  # ["Napa Valley", "Bordeaux"]
+    preferred_countries: Mapped[Optional[list]] = mapped_column(JSONB)  # ["France", "Italy"]
+
+    # Preferred varietals
+    preferred_varietals: Mapped[Optional[list]] = mapped_column(JSONB)  # ["Cabernet Sauvignon", "Pinot Noir"]
+
+    # Price preferences
+    price_range_min: Mapped[Optional[float]] = mapped_column(Float)
+    price_range_max: Mapped[Optional[float]] = mapped_column(Float)
+
+    # Flavor profile preferences (derived from highly-rated wines)
+    flavor_profile: Mapped[Optional[dict]] = mapped_column(JSONB)
+    # e.g., {"body": "full", "sweetness": "dry", "preferred_notes": ["cherry", "oak"]}
+
+    # Stats
+    rating_count: Mapped[int] = mapped_column(Integer, default=0)
+    average_rating: Mapped[Optional[float]] = mapped_column(Float)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    # Relationships
+    user: Mapped["User"] = relationship(backref="taste_profile")
+
+
 # Database session factory
 engine = create_engine(Config.DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)

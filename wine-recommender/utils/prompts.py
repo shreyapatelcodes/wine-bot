@@ -57,7 +57,9 @@ def create_agent2_explanation_prompt(
     wine_varietal: str,
     wine_region: str,
     wine_characteristics: list,
-    wine_flavor_notes: list
+    wine_flavor_notes: list,
+    user_request: str = None,
+    category_knowledge: str = None
 ) -> str:
     """
     Create a prompt for Agent 2 to generate personalized wine explanations.
@@ -70,6 +72,8 @@ def create_agent2_explanation_prompt(
         wine_region: Wine region
         wine_characteristics: List of wine characteristics
         wine_flavor_notes: List of flavor notes
+        user_request: Original user request (for attribution)
+        category_knowledge: Background knowledge (NOT for attribution)
 
     Returns:
         Prompt for explanation generation
@@ -77,10 +81,12 @@ def create_agent2_explanation_prompt(
     characteristics_str = ", ".join(wine_characteristics)
     flavor_notes_str = ", ".join(wine_flavor_notes)
 
-    return f"""Generate a personalized 1-2 sentence explanation for why this wine matches the user's preferences.
+    # Use user_request if available, otherwise fall back to user_preferences
+    explicit_request = user_request or user_preferences
 
-User preferences: {user_preferences}
-Search criteria: {search_query}
+    return f"""Generate a personalized 1-2 sentence explanation for why this wine matches what the user asked for.
+
+WHAT THE USER EXPLICITLY ASKED FOR: {explicit_request}
 
 Wine details:
 - Name: {wine_name}
@@ -89,15 +95,63 @@ Wine details:
 - Characteristics: {characteristics_str}
 - Flavor notes: {flavor_notes_str}
 
-Your explanation should:
-- Connect wine characteristics to user preferences
-- Mention specific flavor notes or regional traits that match what they want
-- Be concise and enthusiastic (1-2 sentences)
-- Avoid generic phrases like "great choice" or "this wine is perfect"
+IMPORTANT ATTRIBUTION RULES:
+1. ONLY attribute preferences the user EXPLICITLY mentioned
+2. If user said "under $40", you can say "within your budget"
+3. If user said "for steak", you can say "pairs well with steak"
+4. If user said "bold red", you can say "delivers the bold character you wanted"
+5. Do NOT claim the user asked for things they didn't mention (like specific regions, flavor notes, etc.)
+6. Focus on: "You asked for X - this wine delivers Y"
 
-Example: "This full-bodied Paso Robles Cabernet delivers the bold, structured character you're looking for with rich blackberry and oak notes that complement grilled steak perfectly."
+Your explanation should:
+- Connect wine characteristics ONLY to what user explicitly requested
+- Mention specific wine qualities that match their stated needs
+- Be concise and conversational (1-2 sentences)
+- Avoid generic phrases like "great choice" or "perfect for you"
+
+GOOD example: "You asked for a bold red for steak - this full-bodied Cabernet has rich tannins and dark fruit that complement grilled meat beautifully."
+
+BAD example: "Since you love fruity wines from California..." (if user never said this)
 
 Generate the explanation:"""
+
+
+def create_agent2_explanation_prompt_simple(
+    user_request: str,
+    wine_name: str,
+    wine_varietal: str,
+    wine_region: str,
+    wine_characteristics: list,
+    wine_flavor_notes: list
+) -> str:
+    """
+    Simplified explanation prompt that focuses on explicit user request.
+
+    Args:
+        user_request: Original user request
+        wine_name: Name of the wine
+        wine_varietal: Wine varietal
+        wine_region: Wine region
+        wine_characteristics: List of wine characteristics
+        wine_flavor_notes: List of flavor notes
+
+    Returns:
+        Prompt for explanation generation
+    """
+    characteristics_str = ", ".join(wine_characteristics[:4])  # Limit for brevity
+    flavor_notes_str = ", ".join(wine_flavor_notes[:4])
+
+    return f"""Write a brief (1-2 sentence) explanation connecting this wine to what the user asked for.
+
+User asked for: {user_request}
+
+Wine: {wine_name} ({wine_varietal} from {wine_region})
+Key traits: {characteristics_str}
+Flavors: {flavor_notes_str}
+
+Pattern: "You wanted [what they said] - this [wine quality] delivers [how it matches]."
+
+Explanation:"""
 
 
 # Streamlit UI text templates

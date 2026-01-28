@@ -17,6 +17,8 @@ import type {
   WineSearchResponse,
   VisionAnalyzeResponse,
   VisionMatchResponse,
+  ChatRequest,
+  ChatResponse,
   ApiError,
 } from '../types';
 
@@ -269,6 +271,21 @@ class ApiClient {
         body: JSON.stringify(request),
       },
       false
+    );
+  }
+
+  // ============== Chat API ==============
+
+  async chat(request: ChatRequest): Promise<ChatResponse> {
+    // Use auth if available (jwt_optional on backend)
+    const hasAuth = !!getAccessToken();
+    return this.request<ChatResponse>(
+      '/api/v1/chat',
+      {
+        method: 'POST',
+        body: JSON.stringify(request),
+      },
+      hasAuth
     );
   }
 

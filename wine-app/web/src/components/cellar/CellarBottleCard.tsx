@@ -51,8 +51,6 @@ export function CellarBottleCard({ bottle, onUpdate, onRemove, onClick }: Cellar
         return 'bg-green-100 text-green-700';
       case 'tried':
         return 'bg-blue-100 text-blue-700';
-      case 'wishlist':
-        return 'bg-purple-100 text-purple-700';
       default:
         return 'bg-gray-100 text-gray-700';
     }
@@ -151,7 +149,7 @@ export function CellarBottleCard({ bottle, onUpdate, onRemove, onClick }: Cellar
         {/* Status tag and actions */}
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
           <span className={`font-mono text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-lg ${getStatusColor(bottle.status)}`}>
-            {bottle.status === 'wishlist' ? 'saved' : bottle.status}
+            {bottle.status}
           </span>
 
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -201,7 +199,7 @@ export function CellarBottleCard({ bottle, onUpdate, onRemove, onClick }: Cellar
             <div onClick={(e) => e.stopPropagation()}>
               <label className="font-mono text-[10px] uppercase tracking-wider text-gray-500">Status</label>
               <div className="flex gap-2 mt-2">
-                {(['owned', 'tried', 'wishlist'] as CellarStatus[]).map((status) => (
+                {(['owned', 'tried'] as CellarStatus[]).map((status) => (
                   <button
                     key={status}
                     onClick={() => setEditData({ ...editData, status })}
@@ -211,7 +209,7 @@ export function CellarBottleCard({ bottle, onUpdate, onRemove, onClick }: Cellar
                         : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                     }`}
                   >
-                    {status === 'wishlist' ? 'saved' : status}
+                    {status}
                   </button>
                 ))}
               </div>

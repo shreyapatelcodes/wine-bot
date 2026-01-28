@@ -2,16 +2,19 @@
  * Wine recommendation card component
  */
 
-import { Bookmark, BookmarkCheck, Wine as WineIcon } from 'lucide-react';
+import { Bookmark, BookmarkCheck, Wine as WineIcon, Camera } from 'lucide-react';
 import type { WineRecommendation, Wine } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 
+type CardType = 'wine' | 'identified_wine' | 'saved';
+
 interface WineCardProps {
   recommendation: WineRecommendation;
+  cardType?: CardType;
   onSave?: (wine: Wine) => void;
 }
 
-export function WineCard({ recommendation, onSave }: WineCardProps) {
+export function WineCard({ recommendation, cardType = 'wine', onSave }: WineCardProps) {
   const { wine, explanation, is_saved, is_in_cellar } = recommendation;
   const { isAuthenticated } = useAuth();
 
@@ -30,18 +33,35 @@ export function WineCard({ recommendation, onSave }: WineCardProps) {
     }
   };
 
+  const getCardLabel = () => {
+    switch (cardType) {
+      case 'identified_wine':
+        return 'Identified';
+      case 'saved':
+        return 'Saved';
+      default:
+        return 'Recommendation';
+    }
+  };
+
+  const isIdentified = cardType === 'identified_wine';
+
   return (
     <div className="bg-white/50 border border-wine-600/10 rounded-xl p-5 hover:shadow-lg transition-all group">
       <div className="flex gap-4">
         {/* Wine image placeholder */}
         <div className="w-16 h-24 bg-cream rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
-          <WineIcon className={`w-8 h-8 ${getWineTypeColor(wine.wine_type)}`} />
+          {isIdentified ? (
+            <Camera className={`w-8 h-8 ${getWineTypeColor(wine.wine_type)}`} />
+          ) : (
+            <WineIcon className={`w-8 h-8 ${getWineTypeColor(wine.wine_type)}`} />
+          )}
         </div>
 
         <div className="flex-1 min-w-0">
-          {/* Wine type label */}
-          <span className="font-mono text-[10px] uppercase tracking-wider text-wine-600">
-            Recommendation
+          {/* Card type label */}
+          <span className={`font-mono text-[10px] uppercase tracking-wider ${isIdentified ? 'text-blue-600' : 'text-wine-600'}`}>
+            {getCardLabel()}
           </span>
 
           {/* Wine name */}
@@ -49,11 +69,26 @@ export function WineCard({ recommendation, onSave }: WineCardProps) {
             {wine.name}
           </h3>
 
-          {/* Location, vintage, price */}
+          {/* Producer */}
+          {wine.producer && (
+            <p className="text-sm text-gray-600 mt-0.5">
+              {wine.producer}
+            </p>
+          )}
+
+          {/* Varietal, Region, Country */}
           <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 mt-1">
-            {[wine.region, wine.country].filter(Boolean).join(', ')}
-            {wine.price_usd && ` \u2022 $${wine.price_usd.toFixed(0)}`}
+            {[wine.varietal, wine.region, wine.country].filter(Boolean).join(' · ')}
           </p>
+
+          {/* Vintage and Price */}
+          {(wine.vintage || wine.price_usd) && (
+            <p className="font-mono text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">
+              {wine.vintage && `${wine.vintage}`}
+              {wine.vintage && wine.price_usd && ' · '}
+              {wine.price_usd && `$${wine.price_usd.toFixed(0)}`}
+            </p>
+          )}
         </div>
 
         {/* Save button */}

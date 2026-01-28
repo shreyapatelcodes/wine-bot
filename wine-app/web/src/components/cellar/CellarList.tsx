@@ -4,7 +4,7 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Wine, Loader2, Package, CheckCircle, Bookmark } from 'lucide-react';
+import { Wine, Loader2, Package, CheckCircle } from 'lucide-react';
 import { useCellar, useCellarStats } from '../../hooks';
 import { CellarBottleCard } from './CellarBottleCard';
 import type { CellarStatus } from '../../types';
@@ -12,7 +12,6 @@ import type { CellarStatus } from '../../types';
 const statusFilters: { value: CellarStatus; label: string; icon: React.ReactNode }[] = [
   { value: 'owned', label: 'Owned', icon: <Package className="w-4 h-4" /> },
   { value: 'tried', label: 'Tried', icon: <CheckCircle className="w-4 h-4" /> },
-  { value: 'wishlist', label: 'Saved', icon: <Bookmark className="w-4 h-4" /> },
 ];
 
 export function CellarList() {
@@ -25,7 +24,6 @@ export function CellarList() {
   const getFilterCount = (value: CellarStatus): number => {
     if (value === 'owned') return stats.owned;
     if (value === 'tried') return stats.tried;
-    if (value === 'wishlist') return stats.wishlist;
     return 0;
   };
 

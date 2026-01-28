@@ -96,7 +96,7 @@ export interface SavedBottlesResponse {
 
 // ============== Cellar Types ==============
 
-export type CellarStatus = 'owned' | 'tried' | 'wishlist';
+export type CellarStatus = 'owned' | 'tried';
 
 export interface CellarBottleCreate {
   wine_id?: string;
@@ -207,12 +207,80 @@ export interface VisionMatchResponse {
 
 export type MessageRole = 'user' | 'assistant' | 'system';
 
+export type IntentType =
+  | 'recommend'
+  | 'educate_general'
+  | 'educate_specific'
+  | 'cellar_add'
+  | 'cellar_query'
+  | 'cellar_remove'
+  | 'rate'
+  | 'decide'
+  | 'correct'
+  | 'photo'
+  | 'greeting'
+  | 'ambiguous'
+  | 'unknown'
+  | 'error';
+
+export interface ChatAction {
+  type: string;
+  label: string;
+  data?: Record<string, unknown>;
+}
+
+export interface ChatCard {
+  type: 'wine' | 'cellar' | 'identified_wine' | 'saved';
+  wine_id?: string;
+  bottle_id?: string;
+  saved_id?: string;
+  wine_name?: string;
+  producer?: string;
+  vintage?: number;
+  wine_type?: WineType;
+  varietal?: string;
+  region?: string;
+  country?: string;
+  price_usd?: number;
+  explanation?: string;
+  relevance_score?: number;
+  is_saved?: boolean;
+  is_in_cellar?: boolean;
+  status?: CellarStatus;
+  quantity?: number;
+  rating?: number;
+  confidence?: number;
+}
+
+export interface ChatRequest {
+  message: string;
+  session_id?: string;
+  image_base64?: string;
+  history?: Array<{ role: string; content: string }>;
+}
+
+export interface ChatResponse {
+  response: string;
+  intent: IntentType;
+  session_id: string;
+  cards: ChatCard[];
+  actions: ChatAction[];
+  requires_auth: boolean;
+  requires_clarification: boolean;
+  confirmation_required: boolean;
+  error?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: MessageRole;
   content: string;
   timestamp: string;
   recommendations?: WineRecommendation[];
+  // New fields for enhanced chat
+  cards?: ChatCard[];
+  actions?: ChatAction[];
+  intent?: IntentType;
 }
 
 // ============== API Response Types ==============

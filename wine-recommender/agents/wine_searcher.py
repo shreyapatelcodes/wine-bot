@@ -64,14 +64,21 @@ class WineSearcher:
 
         # Step 2: Convert matches to Wine objects and create recommendations
         recommendations = []
+
+        # Use preserved user_request for better attribution
+        user_request = getattr(search_query, 'user_request', None) or user_prefs_description
+        category_knowledge = getattr(search_query, 'category_knowledge', None)
+
         for i, match in enumerate(matches[:top_n]):  # Take top N
             wine = self._match_to_wine(match)
 
-            # Generate personalized explanation
+            # Generate personalized explanation with proper attribution
             explanation = self._generate_explanation(
                 user_prefs_description,
                 search_query.query_text,
-                wine
+                wine,
+                user_request=user_request,
+                category_knowledge=category_knowledge
             )
 
             recommendation = WineRecommendation(
@@ -124,7 +131,9 @@ class WineSearcher:
         self,
         user_prefs: str,
         search_query: str,
-        wine: Wine
+        wine: Wine,
+        user_request: str = None,
+        category_knowledge: str = None
     ) -> str:
         """
         Generate personalized explanation for why wine matches user preferences.
@@ -133,6 +142,8 @@ class WineSearcher:
             user_prefs: Original user preferences
             search_query: Generated search query
             wine: Wine object
+            user_request: Original user request (for proper attribution)
+            category_knowledge: WSET knowledge context (not for attribution)
 
         Returns:
             1-2 sentence personalized explanation
@@ -144,7 +155,9 @@ class WineSearcher:
             wine_varietal=wine.varietal,
             wine_region=wine.region,
             wine_characteristics=wine.characteristics,
-            wine_flavor_notes=wine.flavor_notes
+            wine_flavor_notes=wine.flavor_notes,
+            user_request=user_request,
+            category_knowledge=category_knowledge
         )
 
         response = self.client.chat.completions.create(

@@ -60,12 +60,43 @@ class SearchQuery(BaseModel):
         description="Wine type filter: 'red', 'white', 'rosé', or 'sparkling'"
     )
 
+    # Extended filters for better targeting
+    region_filter: Optional[str] = Field(
+        default=None,
+        description="Specific wine region filter"
+    )
+    country_filter: Optional[str] = Field(
+        default=None,
+        description="Country of origin filter"
+    )
+    varietal_filter: Optional[str] = Field(
+        default=None,
+        description="Specific grape varietal filter"
+    )
+    occasion: Optional[str] = Field(
+        default=None,
+        description="Occasion context (dinner party, casual, celebration)"
+    )
+
+    # Preserved user request for better explanations
+    user_request: Optional[str] = Field(
+        default=None,
+        description="Original user request (preserved for attribution)"
+    )
+    category_knowledge: Optional[str] = Field(
+        default=None,
+        description="WSET category knowledge (for explanations, not attribution)"
+    )
+
     class Config:
         json_schema_extra = {
             "example": {
                 "query_text": "Full-bodied Cabernet Sauvignon from Napa Valley with high tannins and bold structure. Rich flavors of blackberry, cassis, and dark fruit with prominent oak influence showing vanilla and mocha notes. Dry with medium-plus acidity and firm tannins that pair excellently with grilled steak and aged cheeses.",
                 "price_range": (40.0, 60.0),
-                "wine_type_filter": "red"
+                "wine_type_filter": "red",
+                "region_filter": "Napa Valley",
+                "user_request": "bold red wine for steak dinner",
+                "category_knowledge": "Full-bodied red wines with high tannins pair well with red meat"
             }
         }
 
