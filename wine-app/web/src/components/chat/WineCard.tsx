@@ -2,21 +2,26 @@
  * Wine recommendation card component
  */
 
-import { Bookmark, BookmarkCheck, Wine as WineIcon, Camera } from 'lucide-react';
+import { Bookmark, BookmarkCheck, Wine as WineIcon, Camera, Star, Package } from 'lucide-react';
 import type { WineRecommendation, Wine } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 
-type CardType = 'wine' | 'identified_wine' | 'saved';
+type CardType = 'wine' | 'identified_wine' | 'saved' | 'cellar';
 
 interface WineCardProps {
-  recommendation: WineRecommendation;
+  recommendation: WineRecommendation & {
+    status?: string;
+    quantity?: number;
+    rating?: number;
+  };
   cardType?: CardType;
   onSave?: (wine: Wine) => void;
 }
 
 export function WineCard({ recommendation, cardType = 'wine', onSave }: WineCardProps) {
-  const { wine, explanation, is_saved, is_in_cellar } = recommendation;
+  const { wine, explanation, is_saved, is_in_cellar, status, quantity, rating } = recommendation;
   const { isAuthenticated } = useAuth();
+  const isCellar = cardType === 'cellar';
 
   const getWineTypeColor = (type: string) => {
     switch (type) {
@@ -39,12 +44,19 @@ export function WineCard({ recommendation, cardType = 'wine', onSave }: WineCard
         return 'Identified';
       case 'saved':
         return 'Saved';
+      case 'cellar':
+        return status === 'owned' ? 'Owned' : 'Tried';
       default:
         return 'Recommendation';
     }
   };
 
   const isIdentified = cardType === 'identified_wine';
+
+  const getStatusColor = () => {
+    if (cardType !== 'cellar') return 'text-wine-600';
+    return status === 'owned' ? 'text-green-600' : 'text-purple-600';
+  };
 
   return (
     <div className="bg-white/50 border border-wine-600/10 rounded-xl p-5 hover:shadow-lg transition-all group">
@@ -60,9 +72,18 @@ export function WineCard({ recommendation, cardType = 'wine', onSave }: WineCard
 
         <div className="flex-1 min-w-0">
           {/* Card type label */}
-          <span className={`font-mono text-[10px] uppercase tracking-wider ${isIdentified ? 'text-blue-600' : 'text-wine-600'}`}>
-            {getCardLabel()}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`font-mono text-[10px] uppercase tracking-wider ${isIdentified ? 'text-blue-600' : getStatusColor()}`}>
+              {isCellar && status === 'owned' && <Package className="w-3 h-3 inline mr-1" />}
+              {isCellar && status === 'tried' && <Star className="w-3 h-3 inline mr-1" />}
+              {getCardLabel()}
+            </span>
+            {isCellar && quantity && quantity > 1 && (
+              <span className="font-mono text-[10px] text-gray-500">
+                x{quantity}
+              </span>
+            )}
+          </div>
 
           {/* Wine name */}
           <h3 className="font-serif text-lg text-gray-900 mt-1 leading-tight">
@@ -88,6 +109,23 @@ export function WineCard({ recommendation, cardType = 'wine', onSave }: WineCard
               {wine.vintage && wine.price_usd && ' · '}
               {wine.price_usd && `$${wine.price_usd.toFixed(0)}`}
             </p>
+          )}
+
+          {/* Rating for cellar cards */}
+          {isCellar && rating && (
+            <div className="flex items-center gap-1 mt-2">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  className={`w-3.5 h-3.5 ${
+                    star <= rating
+                      ? 'fill-amber-400 text-amber-400'
+                      : 'text-gray-300'
+                  }`}
+                />
+              ))}
+              <span className="text-xs text-gray-500 ml-1">{rating}/5</span>
+            </div>
           )}
         </div>
 

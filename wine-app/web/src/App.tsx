@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider } from './context/AuthContext';
 import { Layout } from './components/layout';
-import { ChatPage, CellarPage, WineDetailPage } from './pages';
+import { ChatPage } from './pages';
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -31,8 +31,6 @@ function App() {
             <Routes>
               <Route path="/" element={<Layout />}>
                 <Route index element={<ChatPage />} />
-                <Route path="cellar" element={<CellarPage />} />
-                <Route path="wine/:id" element={<WineDetailPage />} />
               </Route>
             </Routes>
           </BrowserRouter>

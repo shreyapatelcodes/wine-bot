@@ -5,6 +5,7 @@ Classifies user intent and routes to appropriate handlers.
 
 import json
 import re
+import uuid
 from typing import Optional, Dict, Any, List, Tuple
 from openai import OpenAI
 from sqlalchemy.orm import Session
@@ -90,8 +91,59 @@ class ChatOrchestrator:
         if image_base64:
             return self._handle_image(session, message, image_base64)
 
-        # Check for pending request clarification response
         message_lower = message.lower()
+
+        # Check for pending delete confirmation BEFORE intent classification
+        session_context = session.context or {}
+        pending_delete = session_context.get("pending_delete")
+        if pending_delete:
+            is_confirmation = any(word in message_lower for word in ["yes", "confirm", "remove", "delete"])
+            is_cancellation = any(word in message_lower for word in ["no", "cancel", "never mind", "nevermind"])
+
+            if is_confirmation:
+                # Execute the delete
+                bottle_id_str = pending_delete.get("bottle_id")
+                try:
+                    bottle_id = uuid.UUID(bottle_id_str)
+                except (ValueError, TypeError):
+                    bottle_id = None
+
+                bottle = self.db.query(CellarBottle).filter(
+                    CellarBottle.id == bottle_id,
+                    CellarBottle.user_id == self.user.id
+                ).first() if bottle_id else None
+
+                if bottle:
+                    wine_name = bottle.wine.name if bottle.wine else bottle.custom_wine_name
+                    self.db.delete(bottle)
+                    self.db.commit()
+
+                    # Clear pending delete
+                    self.context_manager.update_session_context(session, {"pending_delete": None})
+
+                    response_text = f"Removed {wine_name} from your cellar."
+                    self.context_manager.add_message(session, "assistant", response_text)
+
+                    return self._build_response(
+                        session=session,
+                        response=response_text,
+                        intent="cellar_remove"
+                    )
+
+            elif is_cancellation:
+                # Clear pending delete
+                self.context_manager.update_session_context(session, {"pending_delete": None})
+
+                response_text = "No problem, I won't remove it."
+                self.context_manager.add_message(session, "assistant", response_text)
+
+                return self._build_response(
+                    session=session,
+                    response=response_text,
+                    intent="cellar_remove"
+                )
+
+        # Check for pending request clarification response
         if "recommend something new" in message_lower or "new" in message_lower and "recommend" in message_lower:
             pending = self.context_manager.get_pending_request(session)
             if pending:
@@ -496,7 +548,21 @@ Characteristics: {', '.join(metadata.get('characteristics', []))}
 Flavor Notes: {', '.join(metadata.get('flavor_notes', []))}
 """
         else:
-            wine_details = f"Wine: {wine_ref.get('wine_name', 'Unknown')}"
+            # Build details from wine reference (e.g., from photo scan)
+            details_parts = [f"Name: {wine_ref.get('wine_name', 'Unknown')}"]
+            if wine_ref.get('producer'):
+                details_parts.append(f"Producer: {wine_ref['producer']}")
+            if wine_ref.get('vintage'):
+                details_parts.append(f"Vintage: {wine_ref['vintage']}")
+            if wine_ref.get('wine_type'):
+                details_parts.append(f"Type: {wine_ref['wine_type']}")
+            if wine_ref.get('varietal'):
+                details_parts.append(f"Varietal: {wine_ref['varietal']}")
+            if wine_ref.get('region') or wine_ref.get('country'):
+                location = ', '.join(filter(None, [wine_ref.get('region'), wine_ref.get('country')]))
+                details_parts.append(f"Region: {location}")
+
+            wine_details = '\n'.join(details_parts)
 
         prompt = f"""You are Pip, a wine expert. The user is asking about a specific wine.
 
@@ -532,9 +598,45 @@ Provide helpful information about this wine. Be conversational and informative."
                 requires_auth=True
             )
 
-        # Check if user is asking about saved/wishlist wines
+        # Check if user is asking about saved/wishlist wines or rated wines
         message_lower = message.lower()
         is_saved_query = any(word in message_lower for word in ['saved', 'wishlist', 'want to try', 'to try'])
+        is_rated_query = any(phrase in message_lower for phrase in [
+            'liked', 'rated', 'enjoyed', 'my ratings', 'have i liked', 'have i rated',
+            'wines i\'ve tried', 'wines i tried', 'what did i rate', 'past ratings'
+        ])
+
+        # Handle rated/liked wines query
+        if is_rated_query:
+            rated_bottles = self.db.query(CellarBottle).filter(
+                CellarBottle.user_id == self.user.id,
+                CellarBottle.rating.isnot(None)
+            ).order_by(CellarBottle.rating.desc()).limit(10).all()
+
+            if not rated_bottles:
+                response_text = "You haven't rated any wines yet. After you try a wine, let me know and I'll ask you to rate it!"
+                self.context_manager.add_message(session, "assistant", response_text)
+                return self._build_response(
+                    session=session,
+                    response=response_text,
+                    intent="cellar_query"
+                )
+
+            response_text = f"Here are the wines you've rated:"
+
+            cards = []
+            for bottle in rated_bottles[:5]:
+                card = self._bottle_to_card(bottle)
+                cards.append(card)
+
+            self.context_manager.add_message(session, "assistant", response_text)
+
+            return self._build_response(
+                session=session,
+                response=response_text,
+                intent="cellar_query",
+                cards=cards
+            )
 
         # Get status from entities or infer from message
         status = entities.get("status")
@@ -752,13 +854,20 @@ Provide helpful information about this wine. Be conversational and informative."
         session_context = session.context or {}
         pending_delete = session_context.get("pending_delete")
 
-        if pending_delete and message.lower() in ["yes", "confirm", "remove it", "delete it"]:
+        message_lower = message.lower()
+        is_confirmation = any(word in message_lower for word in ["yes", "confirm", "remove", "delete"])
+        if pending_delete and is_confirmation:
             # Execute the delete
-            bottle_id = pending_delete.get("bottle_id")
+            bottle_id_str = pending_delete.get("bottle_id")
+            try:
+                bottle_id = uuid.UUID(bottle_id_str)
+            except (ValueError, TypeError):
+                bottle_id = None
+
             bottle = self.db.query(CellarBottle).filter(
                 CellarBottle.id == bottle_id,
                 CellarBottle.user_id == self.user.id
-            ).first()
+            ).first() if bottle_id else None
 
             if bottle:
                 wine_name = bottle.wine.name if bottle.wine else bottle.custom_wine_name
@@ -777,36 +886,59 @@ Provide helpful information about this wine. Be conversational and informative."
                     intent="cellar_remove"
                 )
 
-        # Get wine reference to remove
-        wine_refs = self.context_manager.get_recent_wine_references(session)
-
-        if not wine_refs:
-            return self._build_response(
-                session=session,
-                response="Which wine would you like to remove from your cellar?",
-                intent="cellar_remove"
-            )
-
-        wine_ref = wine_refs[0]
-        wine_id = wine_ref.get("wine_id")
-
-        # Find in cellar
-        query = self.db.query(CellarBottle).filter(
+        # First, try to find the wine name in the user's message
+        # Get all bottles in cellar to match against
+        all_bottles = self.db.query(CellarBottle).filter(
             CellarBottle.user_id == self.user.id
-        )
-        if wine_id:
-            query = query.filter(CellarBottle.wine_id == wine_id)
-        else:
-            query = query.filter(
-                CellarBottle.custom_wine_name.ilike(f"%{wine_ref.get('wine_name', '')}%")
-            )
+        ).all()
 
-        bottle = query.first()
+        bottle = None
+        message_lower = message.lower()
+
+        # Try to match wine name from message against cellar bottles
+        for b in all_bottles:
+            wine_name = b.wine.name if b.wine else b.custom_wine_name
+            if wine_name:
+                # Check if wine name appears in the message
+                wine_name_lower = wine_name.lower()
+                name_words = [w for w in wine_name_lower.split() if len(w) > 2]
+                if name_words:
+                    matches = sum(1 for word in name_words if word in message_lower)
+                    if matches >= len(name_words) * 0.5:  # At least 50% match
+                        bottle = b
+                        break
+
+        # If no match from message, fall back to recent wine references
+        if not bottle:
+            wine_refs = self.context_manager.get_recent_wine_references(session)
+
+            if not wine_refs:
+                return self._build_response(
+                    session=session,
+                    response="Which wine would you like to remove from your cellar?",
+                    intent="cellar_remove"
+                )
+
+            wine_ref = wine_refs[0]
+            wine_id = wine_ref.get("wine_id")
+
+            # Find in cellar
+            query = self.db.query(CellarBottle).filter(
+                CellarBottle.user_id == self.user.id
+            )
+            if wine_id:
+                query = query.filter(CellarBottle.wine_id == wine_id)
+            else:
+                query = query.filter(
+                    CellarBottle.custom_wine_name.ilike(f"%{wine_ref.get('wine_name', '')}%")
+                )
+
+            bottle = query.first()
 
         if not bottle:
             return self._build_response(
                 session=session,
-                response=f"I couldn't find {wine_ref.get('wine_name')} in your cellar.",
+                response="I couldn't find that wine in your cellar.",
                 intent="cellar_remove"
             )
 
@@ -849,43 +981,151 @@ Provide helpful information about this wine. Be conversational and informative."
                 requires_auth=True
             )
 
-        # Extract rating from message
-        rating = self._extract_rating(message)
+        # First, try to find the wine name in recent conversation (including current message)
+        cellar_bottle = None
+        wine_name = None
+        wine_id = None
 
-        if rating is None:
-            return self._build_response(
-                session=session,
-                response="How would you rate this wine? You can say something like '4 stars' or 'I'd give it a 3.5'.",
-                intent="rate"
-            )
+        # Get all bottles in cellar to match against
+        all_bottles = self.db.query(CellarBottle).filter(
+            CellarBottle.user_id == self.user.id
+        ).all()
 
-        # Get wine reference
-        wine_refs = self.context_manager.get_recent_wine_references(session)
+        # Also get all wines from the database
+        all_wines = self.db.query(Wine).all()
 
-        if not wine_refs:
+        # Build search text from recent history
+        search_text = message.lower()
+        for msg in history[-4:]:  # Check last 4 messages
+            search_text += " " + msg.get("content", "").lower()
+
+        # Try to match against cellar bottles first
+        for b in all_bottles:
+            bottle_wine_name = b.wine.name if b.wine else b.custom_wine_name
+            if bottle_wine_name:
+                name_lower = bottle_wine_name.lower()
+                name_words = [w for w in name_lower.split() if len(w) > 3]
+                if name_words:
+                    matches = sum(1 for word in name_words if word in search_text)
+                    if matches >= len(name_words) * 0.4:  # At least 40% match
+                        cellar_bottle = b
+                        wine_name = bottle_wine_name
+                        break
+
+        # If no cellar match, try to match against all wines in database
+        if not cellar_bottle:
+            for w in all_wines:
+                name_lower = w.name.lower()
+                name_words = [word for word in name_lower.split() if len(word) > 3]
+                if name_words:
+                    matches = sum(1 for word in name_words if word in search_text)
+                    if matches >= len(name_words) * 0.4:
+                        wine_id = w.id
+                        wine_name = w.name
+                        break
+
+        # Fall back to recent wine references if no match found
+        if not cellar_bottle and not wine_id:
+            wine_refs = self.context_manager.get_recent_wine_references(session)
+            if wine_refs:
+                wine_ref = wine_refs[0]
+                wine_id = wine_ref.get("wine_id")
+                wine_name = wine_ref.get("wine_name")
+
+                if wine_id:
+                    cellar_bottle = self.db.query(CellarBottle).filter(
+                        CellarBottle.user_id == self.user.id,
+                        CellarBottle.wine_id == wine_id
+                    ).first()
+
+        if not cellar_bottle and not wine_id and not wine_name:
             return self._build_response(
                 session=session,
                 response="Which wine would you like to rate?",
                 intent="rate"
             )
 
-        wine_ref = wine_refs[0]
-        wine_id = wine_ref.get("wine_id")
+        # Extract rating from message
+        rating = self._extract_rating(message)
 
-        # Find in cellar or create tried entry
-        cellar_bottle = None
-        if wine_id:
+        # Check if user indicated they drank/tried the wine
+        message_lower = message.lower()
+        consumed_indicators = ["i drank", "i tried", "i had", "i finished", "just drank", "just tried", "just had"]
+        user_consumed = any(indicator in message_lower for indicator in consumed_indicators)
+
+        # Find or create cellar entry
+        if not cellar_bottle and wine_id:
             cellar_bottle = self.db.query(CellarBottle).filter(
                 CellarBottle.user_id == self.user.id,
                 CellarBottle.wine_id == wine_id
             ).first()
 
+        # If user consumed wine but no rating yet, mark as tried and ask for rating
+        if user_consumed and rating is None:
+            if cellar_bottle:
+                # Update existing bottle to tried
+                if cellar_bottle.status == "owned":
+                    cellar_bottle.status = "tried"
+                    self.db.commit()
+
+                # Store wine reference for when they provide rating
+                self.context_manager.update_session_context(session, {
+                    "recent_wine": {
+                        "wine_id": str(cellar_bottle.wine_id) if cellar_bottle.wine_id else None,
+                        "wine_name": wine_name
+                    }
+                })
+
+                response_text = f"Nice! How would you rate {wine_name} out of 5?"
+            else:
+                # Wine not in cellar, create tried entry without rating
+                cellar_bottle = CellarBottle(
+                    user_id=self.user.id,
+                    wine_id=wine_id,
+                    custom_wine_name=wine_name if not wine_id else None,
+                    status="tried",
+                    quantity=0
+                )
+                self.db.add(cellar_bottle)
+                self.db.commit()
+
+                self.context_manager.update_session_context(session, {
+                    "recent_wine": {
+                        "wine_id": str(wine_id) if wine_id else None,
+                        "wine_name": wine_name
+                    }
+                })
+
+                response_text = f"Added {wine_name} to your tried wines! How would you rate it out of 5?"
+
+            self.context_manager.add_message(session, "assistant", response_text)
+            return self._build_response(
+                session=session,
+                response=response_text,
+                intent="rate"
+            )
+
+        # If no rating provided at all, ask for one
+        if rating is None:
+            self.context_manager.update_session_context(session, {
+                "recent_wine": {
+                    "wine_id": str(wine_id) if wine_id else None,
+                    "wine_name": wine_name
+                }
+            })
+            return self._build_response(
+                session=session,
+                response=f"How would you rate {wine_name or 'this wine'} out of 5?",
+                intent="rate"
+            )
+
+        # We have a rating - save it
         if not cellar_bottle:
             # Create a "tried" entry
             cellar_bottle = CellarBottle(
                 user_id=self.user.id,
                 wine_id=wine_id,
-                custom_wine_name=wine_ref.get("wine_name") if not wine_id else None,
+                custom_wine_name=wine_name if not wine_id else None,
                 status="tried",
                 quantity=0,
                 rating=rating
@@ -898,8 +1138,16 @@ Provide helpful information about this wine. Be conversational and informative."
 
         self.db.commit()
 
-        wine_name = wine_ref.get("wine_name", "this wine")
-        response_text = f"Got it! Rated {wine_name} {rating}/5. Would you like to add any tasting notes?"
+        wine_name = wine_name or "this wine"
+        response_text = f"Got it! Rated {wine_name} {rating}/5."
+
+        # Store wine reference for potential removal
+        self.context_manager.update_session_context(session, {
+            "recent_wine": {
+                "wine_id": str(cellar_bottle.wine_id) if cellar_bottle.wine_id else None,
+                "wine_name": wine_name
+            }
+        })
 
         self.context_manager.add_message(session, "assistant", response_text)
 
@@ -1101,13 +1349,14 @@ Or you can just tell me the wine name and I'll help from there!"""
             response_text += f" ({vintage})"
         response_text += "! What would you like to do with it?"
 
-        # Store wine reference
+        # Store wine reference with all available details
         self.context_manager.add_message(
             session, "assistant", response_text,
             metadata={
                 "wine_reference": {
                     "wine_name": wine_name,
                     "producer": producer,
+                    "vintage": vintage,
                     "wine_type": wine_type,
                     "varietal": varietal,
                     "region": region,
@@ -1314,6 +1563,7 @@ What would you like to do?"""
                 "wine_type": bottle.custom_wine_type,
                 "varietal": bottle.custom_wine_varietal,
                 "region": bottle.custom_wine_region,
+                "country": bottle.custom_wine_country,
                 "status": bottle.status,
                 "quantity": bottle.quantity,
                 "rating": bottle.rating

@@ -6,7 +6,6 @@ import { User } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import type { ChatMessage as ChatMessageType, Wine, ChatAction, ChatCard } from '../../types';
 import { WineCard } from './WineCard';
-import { CellarCard } from './CellarCard';
 import { ActionButtons } from './ActionButtons';
 
 interface ChatMessageProps {
@@ -25,7 +24,7 @@ export function ChatMessage({ message, onSaveWine, onAction }: ChatMessageProps)
     return (
       <div className="mt-4 space-y-3 w-full">
         {message.cards.map((card, index) => {
-          if (card.type === 'wine' || card.type === 'identified_wine' || card.type === 'saved') {
+          if (card.type === 'wine' || card.type === 'identified_wine' || card.type === 'saved' || card.type === 'cellar') {
             // Convert card to WineRecommendation format for WineCard
             const wineRec = {
               wine: {
@@ -42,7 +41,11 @@ export function ChatMessage({ message, onSaveWine, onAction }: ChatMessageProps)
               explanation: card.explanation || '',
               relevance_score: card.relevance_score || 0,
               is_saved: card.type === 'saved' ? true : (card.is_saved || false),
-              is_in_cellar: card.is_in_cellar || false,
+              is_in_cellar: card.type === 'cellar' ? true : (card.is_in_cellar || false),
+              // Cellar-specific properties
+              status: card.status,
+              quantity: card.quantity,
+              rating: card.rating,
             };
 
             return (
@@ -79,17 +82,23 @@ export function ChatMessage({ message, onSaveWine, onAction }: ChatMessageProps)
                     />
                   </div>
                 )}
+                {/* Card-specific actions for cellar wines */}
+                {card.type === 'cellar' && onAction && (
+                  <div className="mt-3 ml-20">
+                    <ActionButtons
+                      actions={[
+                        { type: 'tell_more', label: 'Details' },
+                        ...(card.status === 'owned' && (card.quantity ?? 0) > 0
+                          ? [{ type: 'decide', label: 'Drink tonight?' }]
+                          : []),
+                        { type: 'remove_bottle', label: 'Remove' },
+                      ]}
+                      onAction={onAction}
+                      cardContext={card}
+                    />
+                  </div>
+                )}
               </div>
-            );
-          }
-
-          if (card.type === 'cellar') {
-            return (
-              <CellarCard
-                key={`${card.bottle_id}-${index}`}
-                card={card}
-                onAction={onAction}
-              />
             );
           }
 

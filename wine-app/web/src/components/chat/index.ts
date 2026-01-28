@@ -5,4 +5,3 @@ export { WineCard } from './WineCard';
 export { WineCardSkeleton } from './WineCardSkeleton';
 export { TypingIndicator } from './TypingIndicator';
 export { ActionButtons } from './ActionButtons';
-export { CellarCard } from './CellarCard';

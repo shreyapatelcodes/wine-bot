@@ -3,7 +3,7 @@
  */
 
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { Trash2, Camera } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { TypingIndicator } from './TypingIndicator';
@@ -100,22 +100,11 @@ export function ChatContainer() {
 
         {/* Input area */}
         <div className="bg-white border-t border-gray-100 p-4 md:p-6 rounded-t-2xl shadow-sm">
-          <div className="flex items-end gap-2">
-            {/* Photo upload button */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isLoading}
-              className="p-3 text-gray-400 hover:text-wine-600 hover:bg-cream rounded-xl transition-colors disabled:opacity-50"
-              title="Scan wine label"
-            >
-              <Camera className="w-5 h-5" />
-            </button>
-
-            {/* Main input */}
-            <div className="flex-1">
-              <ChatInput onSend={sendMessage} isLoading={isLoading} />
-            </div>
-          </div>
+          <ChatInput
+            onSend={sendMessage}
+            onCameraClick={() => fileInputRef.current?.click()}
+            isLoading={isLoading}
+          />
 
           {/* Hidden file input for image upload */}
           <input

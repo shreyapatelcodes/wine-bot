@@ -216,6 +216,14 @@ export function useChat(): UseChatReturn {
           await sendMessage('Pick from my cellar');
           break;
 
+        case 'remove_bottle':
+          if (cardContext?.wine_name) {
+            await sendMessage(`Remove ${cardContext.wine_name} from my cellar`);
+          } else {
+            await sendMessage('Remove this from my cellar');
+          }
+          break;
+
         default:
           // For any other action, send it as a message
           if (action.label) {

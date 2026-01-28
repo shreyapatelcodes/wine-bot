@@ -12,9 +12,9 @@ INTENTS:
 - educate_general: User asks about wine knowledge (e.g., "what's the difference between Syrah and Shiraz?")
 - educate_specific: User asks about a specific wine they mentioned or we recommended
 - cellar_add: User wants to add a wine to their cellar (e.g., "add this to my cellar", "I bought this one")
-- cellar_query: User asks about their cellar (e.g., "what's in my cellar?", "show me my reds")
+- cellar_query: User asks about their cellar OR past ratings (e.g., "what's in my cellar?", "show me my reds", "what wines have I liked?", "my ratings", "wines I've tried")
 - cellar_remove: User wants to remove from cellar (e.g., "remove this", "delete that wine")
-- rate: User wants to rate a wine (e.g., "I'd give it 4 stars", "rate this 3.5")
+- rate: User wants to rate a wine OR indicates they drank/tried a wine (e.g., "I'd give it 4 stars", "rate this 3.5", "I drank the Merlot", "I tried the Pinot", "I had the Cabernet")
 - decide: User wants help picking from wines they ALREADY OWN (e.g., "what should I drink tonight from my cellar?", "which of my wines for pasta?")
 - correct: User wants to modify/undo (e.g., "actually under $30", "undo that", "wait, I meant white")
 - photo: User uploaded an image (image analysis needed)
@@ -25,8 +25,10 @@ CONTEXT RULES:
 - If message contains price terms ("under $X", "around $X", "cheap", "expensive") → "recommend" (they're shopping)
 - If message is a question about wine facts/knowledge → "educate_general"
 - If user explicitly says "my cellar", "what I have", "my wines", "I own" → "cellar_query" or "decide"
+- If user asks about wines they've "liked", "rated", "tried", or "enjoyed" → "cellar_query"
 - If user says "add", "save", "bought", "got this" about a wine → "cellar_add"
 - If user mentions rating, stars, or score after discussing a wine → "rate"
+- If user says "I drank", "I tried", "I had", "I finished" with a wine name → "rate" (they want to log/rate it)
 - If user says "actually", "wait", "undo", "I meant" → "correct"
 
 AMBIGUOUS CASES - Set requires_clarification to true:

@@ -3,15 +3,16 @@
  */
 
 import { useState, useRef, type FormEvent, type KeyboardEvent } from 'react';
-import { Loader2, Camera, ArrowRight } from 'lucide-react';
+import { Loader2, ArrowRight, Camera } from 'lucide-react';
 
 interface ChatInputProps {
   onSend: (message: string) => void;
+  onCameraClick?: () => void;
   isLoading?: boolean;
   placeholder?: string;
 }
 
-export function ChatInput({ onSend, isLoading, placeholder = "Ask about pairings, regions, or bottle IDs..." }: ChatInputProps) {
+export function ChatInput({ onSend, onCameraClick, isLoading, placeholder = "Ask about pairings, regions, or bottle IDs..." }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -46,13 +47,17 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask about pairings
     <form onSubmit={handleSubmit} className="relative bg-white rounded-2xl border border-gray-200 p-2 shadow-sm focus-within:ring-1 focus-within:ring-wine-500/20 focus-within:border-wine-500/30 transition-all">
       <div className="flex items-center gap-2">
         {/* Camera button */}
-        <button
-          type="button"
-          className="flex-shrink-0 p-2 text-gray-400 hover:text-wine-600 transition-colors rounded-lg hover:bg-cream"
-          title="Scan wine label"
-        >
-          <Camera className="w-5 h-5" />
-        </button>
+        {onCameraClick && (
+          <button
+            type="button"
+            onClick={onCameraClick}
+            disabled={isLoading}
+            className="flex-shrink-0 p-2 text-gray-400 hover:text-wine-600 transition-colors rounded-lg hover:bg-cream disabled:opacity-50"
+            title="Scan wine label"
+          >
+            <Camera className="w-5 h-5" />
+          </button>
+        )}
 
         {/* Text input */}
         <textarea

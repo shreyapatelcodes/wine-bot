@@ -9,7 +9,7 @@ export function Layout() {
   return (
     <div className="min-h-screen bg-cream">
       <Sidebar />
-      <main className="pt-16">
+      <main>
         <Outlet />
       </main>
     </div>
