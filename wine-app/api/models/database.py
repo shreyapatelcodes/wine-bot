@@ -117,6 +117,13 @@ class Wine(Base):
     saved_bottles: Mapped[list["SavedBottle"]] = relationship(back_populates="wine")
     cellar_bottles: Mapped[list["CellarBottle"]] = relationship(back_populates="wine")
 
+    __table_args__ = (
+        Index("idx_wines_name", "name"),
+        Index("idx_wines_wine_type", "wine_type"),
+        Index("idx_wines_varietal", "varietal"),
+        Index("idx_wines_producer", "producer"),
+    )
+
 
 class SavedBottle(Base):
     """
@@ -149,6 +156,8 @@ class SavedBottle(Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "wine_id", name="uq_saved_bottle_user_wine"),
+        Index("idx_saved_bottles_user_id", "user_id"),
+        Index("idx_saved_bottles_wine_id", "wine_id"),
     )
 
 
@@ -218,6 +227,8 @@ class CellarBottle(Base):
 
     __table_args__ = (
         Index("idx_cellar_user_status", "user_id", "status"),
+        Index("idx_cellar_user_id", "user_id"),
+        Index("idx_cellar_wine_id", "wine_id"),
     )
 
 
