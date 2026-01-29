@@ -192,7 +192,13 @@ def create_app():
     app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(seconds=Config.JWT_REFRESH_TOKEN_EXPIRES)
 
     # Initialize extensions
-    CORS(app, origins=["http://localhost:5173", Config.WEB_URL])
+    CORS(
+        app,
+        origins=["http://localhost:5173", "http://localhost:5001", Config.WEB_URL],
+        supports_credentials=True,
+        allow_headers=["Content-Type", "Authorization"],
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    )
     jwt.init_app(app)
 
     # ============== Health Check ==============
