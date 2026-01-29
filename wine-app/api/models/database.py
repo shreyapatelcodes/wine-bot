@@ -185,7 +185,7 @@ class CellarBottle(Base):
     # Cellar status
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="owned"
-    )  # 'owned', 'tried', 'wishlist'
+    )  # 'owned', 'tried'
     quantity: Mapped[int] = mapped_column(Integer, default=1)
 
     # Purchase info

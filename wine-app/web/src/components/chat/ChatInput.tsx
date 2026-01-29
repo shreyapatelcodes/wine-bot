@@ -44,15 +44,15 @@ export function ChatInput({ onSend, onCameraClick, isLoading, placeholder = "Ask
   };
 
   return (
-    <form onSubmit={handleSubmit} className="relative bg-white rounded-2xl border border-gray-200 p-2 shadow-sm focus-within:ring-1 focus-within:ring-wine-500/20 focus-within:border-wine-500/30 transition-all">
-      <div className="flex items-center gap-2">
+    <form onSubmit={handleSubmit} className="relative bg-white rounded-full border border-gray-200 px-2 py-1.5 shadow-sm focus-within:ring-1 focus-within:ring-wine-500/20 focus-within:border-wine-500/30 transition-all">
+      <div className="flex items-center gap-1">
         {/* Camera button */}
         {onCameraClick && (
           <button
             type="button"
             onClick={onCameraClick}
             disabled={isLoading}
-            className="flex-shrink-0 p-2 text-gray-400 hover:text-wine-600 transition-colors rounded-lg hover:bg-cream disabled:opacity-50"
+            className="flex-shrink-0 p-2 text-gray-400 hover:text-wine-600 transition-colors rounded-full hover:bg-cream disabled:opacity-50"
             title="Scan wine label"
           >
             <Camera className="w-5 h-5" />
@@ -69,21 +69,25 @@ export function ChatInput({ onSend, onCameraClick, isLoading, placeholder = "Ask
           placeholder={placeholder}
           disabled={isLoading}
           rows={1}
-          className="flex-1 resize-none bg-transparent border-none px-2 py-2.5 text-sm focus:outline-none focus:ring-0 disabled:text-gray-400 placeholder:text-gray-400"
+          className="flex-1 resize-none bg-transparent border-none px-2 py-2 text-sm focus:outline-none focus:ring-0 disabled:text-gray-400 placeholder:text-gray-400"
         />
 
         {/* Submit button */}
         <button
           type="submit"
           disabled={!message.trim() || isLoading}
-          className="flex-shrink-0 px-5 py-2.5 rounded-xl bg-wine-600 text-white flex items-center gap-2 hover:bg-wine-700 transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed shadow-lg shadow-wine-600/20"
+          className={`flex-shrink-0 px-4 py-2 rounded-full flex items-center gap-2 transition-colors ${
+            message.trim() && !isLoading
+              ? 'bg-wine-600 text-white hover:bg-wine-700'
+              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+          }`}
         >
           {isLoading ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
             <>
-              <span className="font-mono text-xs uppercase tracking-wider">Consult Agent</span>
-              <ArrowRight className="w-4 h-4" />
+              <span className="font-mono text-[11px] uppercase tracking-wider">Consult Agent</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </>
           )}
         </button>

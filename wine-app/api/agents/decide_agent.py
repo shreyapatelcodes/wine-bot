@@ -46,8 +46,7 @@ class DecideAgent:
         # Get owned bottles from cellar
         bottles = self.db.query(CellarBottle).filter(
             CellarBottle.user_id == self.user.id,
-            CellarBottle.status == "owned",
-            CellarBottle.quantity > 0
+            CellarBottle.status == "owned"
         ).all()
 
         if not bottles:
@@ -155,8 +154,7 @@ For each recommendation, briefly explain why it's a good pick."""
         """
         bottles = self.db.query(CellarBottle).filter(
             CellarBottle.user_id == self.user.id,
-            CellarBottle.status == "owned",
-            CellarBottle.quantity > 0
+            CellarBottle.status == "owned"
         ).all()
 
         if not bottles:
@@ -232,7 +230,6 @@ For each recommendation, briefly explain why it's a good pick."""
                 desc += f" - ${wine.price_usd}"
             if bottle.rating:
                 desc += f" [Rated: {bottle.rating}/5]"
-            desc += f" (Qty: {bottle.quantity})"
             return desc
         else:
             desc = f"- {bottle.custom_wine_name or 'Unknown Wine'}"
@@ -244,7 +241,6 @@ For each recommendation, briefly explain why it's a good pick."""
                 desc += f" - {bottle.custom_wine_varietal}"
             if bottle.rating:
                 desc += f" [Rated: {bottle.rating}/5]"
-            desc += f" (Qty: {bottle.quantity})"
             return desc
 
     def _extract_recommended_bottles(
@@ -284,7 +280,6 @@ For each recommendation, briefly explain why it's a good pick."""
                 "varietal": bottle.wine.varietal,
                 "region": bottle.wine.region,
                 "price_usd": bottle.wine.price_usd,
-                "quantity": bottle.quantity,
                 "rating": bottle.rating
             }
         else:
@@ -297,7 +292,6 @@ For each recommendation, briefly explain why it's a good pick."""
                 "varietal": bottle.custom_wine_varietal,
                 "region": bottle.custom_wine_region,
                 "price_usd": bottle.purchase_price,
-                "quantity": bottle.quantity,
                 "rating": bottle.rating
             }
 

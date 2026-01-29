@@ -11,7 +11,6 @@ type CardType = 'wine' | 'identified_wine' | 'saved' | 'cellar';
 interface WineCardProps {
   recommendation: WineRecommendation & {
     status?: string;
-    quantity?: number;
     rating?: number;
   };
   cardType?: CardType;
@@ -19,7 +18,7 @@ interface WineCardProps {
 }
 
 export function WineCard({ recommendation, cardType = 'wine', onSave }: WineCardProps) {
-  const { wine, explanation, is_saved, is_in_cellar, status, quantity, rating } = recommendation;
+  const { wine, explanation, is_saved, is_in_cellar, status, rating } = recommendation;
   const { isAuthenticated } = useAuth();
   const isCellar = cardType === 'cellar';
 
@@ -43,7 +42,7 @@ export function WineCard({ recommendation, cardType = 'wine', onSave }: WineCard
       case 'identified_wine':
         return 'Identified';
       case 'saved':
-        return 'Saved';
+        return 'Want to Try';
       case 'cellar':
         return status === 'owned' ? 'Owned' : 'Tried';
       default:
@@ -76,13 +75,9 @@ export function WineCard({ recommendation, cardType = 'wine', onSave }: WineCard
             <span className={`font-mono text-[10px] uppercase tracking-wider ${isIdentified ? 'text-blue-600' : getStatusColor()}`}>
               {isCellar && status === 'owned' && <Package className="w-3 h-3 inline mr-1" />}
               {isCellar && status === 'tried' && <Star className="w-3 h-3 inline mr-1" />}
+              {cardType === 'saved' && <Bookmark className="w-3 h-3 inline mr-1" />}
               {getCardLabel()}
             </span>
-            {isCellar && quantity && quantity > 1 && (
-              <span className="font-mono text-[10px] text-gray-500">
-                x{quantity}
-              </span>
-            )}
           </div>
 
           {/* Wine name */}
@@ -130,7 +125,7 @@ export function WineCard({ recommendation, cardType = 'wine', onSave }: WineCard
         </div>
 
         {/* Save button */}
-        {isAuthenticated && onSave && !is_in_cellar && (
+        {isAuthenticated && onSave && !is_in_cellar && cardType !== 'saved' && (
           <button
             onClick={() => onSave(wine)}
             className={`self-start p-2 rounded-xl transition-colors ${
@@ -146,11 +141,6 @@ export function WineCard({ recommendation, cardType = 'wine', onSave }: WineCard
               <Bookmark className="w-5 h-5" />
             )}
           </button>
-        )}
-        {is_in_cellar && (
-          <span className="self-start font-mono text-[10px] uppercase tracking-wider bg-green-100 text-green-700 px-3 py-1.5 rounded-lg">
-            In Cellar
-          </span>
         )}
       </div>
 

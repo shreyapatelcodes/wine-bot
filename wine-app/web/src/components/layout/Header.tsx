@@ -4,7 +4,7 @@
 
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Wine, MessageCircle, Bookmark, Package, User, LogOut, Menu, X } from 'lucide-react';
+import { MessageCircle, Bookmark, Package, User, LogOut, Menu, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { LoginModal } from '../auth';
 
@@ -33,10 +33,10 @@ export function Header() {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-wine-600 to-wine-800 rounded-lg flex items-center justify-center">
-                <Wine className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 bg-wine-600 rounded-full flex items-center justify-center">
+                <span className="font-serif text-white text-lg italic">P</span>
               </div>
-              <span className="font-semibold text-gray-900">WineAI</span>
+              <span className="font-serif italic text-xl text-wine-600">Pip</span>
             </Link>
 
             {/* Desktop Navigation */}

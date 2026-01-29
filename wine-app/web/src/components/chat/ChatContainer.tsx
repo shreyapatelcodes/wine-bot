@@ -3,7 +3,6 @@
  */
 
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { Trash2 } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { TypingIndicator } from './TypingIndicator';
@@ -13,7 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import type { Wine, ChatAction, ChatCard } from '../../types';
 
 export function ChatContainer() {
-  const { messages, isLoading, expectsCards, sendMessage, handleAction, clearChat } = useChat();
+  const { messages, isLoading, expectsCards, sendMessage, handleAction } = useChat();
   const { saveBottle } = useSavedBottles();
   const { isAuthenticated } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -85,7 +84,7 @@ export function ChatContainer() {
     <>
       <div className="flex flex-col h-full">
         {/* Messages area */}
-        <div className="flex-1 overflow-y-auto py-6 space-y-6">
+        <div className="flex-1 overflow-y-auto py-6 pb-24 space-y-6">
           {messages.map((message) => (
             <ChatMessage
               key={message.id}
@@ -98,13 +97,15 @@ export function ChatContainer() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input area */}
-        <div className="bg-white border-t border-gray-100 p-4 md:p-6 rounded-t-2xl shadow-sm">
-          <ChatInput
-            onSend={sendMessage}
-            onCameraClick={() => fileInputRef.current?.click()}
-            isLoading={isLoading}
-          />
+        {/* Input area - fixed at bottom */}
+        <div className="fixed bottom-0 left-0 right-0 p-4 pb-6 bg-gradient-to-t from-cream via-cream to-transparent">
+          <div className="max-w-3xl mx-auto">
+            <ChatInput
+              onSend={sendMessage}
+              onCameraClick={() => fileInputRef.current?.click()}
+              isLoading={isLoading}
+            />
+          </div>
 
           {/* Hidden file input for image upload */}
           <input
@@ -114,19 +115,6 @@ export function ChatContainer() {
             onChange={handleImageUpload}
             className="hidden"
           />
-
-          {/* Clear chat button */}
-          {messages.length > 1 && (
-            <div className="flex justify-center mt-4">
-              <button
-                onClick={clearChat}
-                className="flex items-center gap-2 text-xs text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <Trash2 className="w-3 h-3" />
-                Clear conversation
-              </button>
-            </div>
-          )}
         </div>
       </div>
 

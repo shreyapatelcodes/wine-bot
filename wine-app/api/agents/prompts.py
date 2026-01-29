@@ -12,7 +12,11 @@ INTENTS:
 - educate_general: User asks about wine knowledge (e.g., "what's the difference between Syrah and Shiraz?")
 - educate_specific: User asks about a specific wine they mentioned or we recommended
 - cellar_add: User wants to add a wine to their cellar (e.g., "add this to my cellar", "I bought this one")
-- cellar_query: User asks about their cellar OR past ratings (e.g., "what's in my cellar?", "show me my reds", "what wines have I liked?", "my ratings", "wines I've tried")
+- cellar_query: User asks about their collection - this includes THREE categories:
+  - Cellar/owned wines: "what's in my cellar?", "show me my reds", "wines I own"
+  - Tried wines: "what have I tried?", "wines I've tasted", "my tried list"
+  - Want to try list: "wines I want to try", "my saved wines", "wines to try"
+  - Past ratings: "what wines have I liked?", "my ratings"
 - cellar_remove: User wants to remove from cellar (e.g., "remove this", "delete that wine")
 - rate: User wants to rate a wine OR indicates they drank/tried a wine (e.g., "I'd give it 4 stars", "rate this 3.5", "I drank the Merlot", "I tried the Pinot", "I had the Cabernet")
 - decide: User wants help picking from wines they ALREADY OWN (e.g., "what should I drink tonight from my cellar?", "which of my wines for pasta?")
@@ -26,6 +30,7 @@ CONTEXT RULES:
 - If message is a question about wine facts/knowledge → "educate_general"
 - If user explicitly says "my cellar", "what I have", "my wines", "I own" → "cellar_query" or "decide"
 - If user asks about wines they've "liked", "rated", "tried", or "enjoyed" → "cellar_query"
+- If user asks about "wines to try", "want to try", "saved wines" → "cellar_query"
 - If user says "add", "save", "bought", "got this" about a wine → "cellar_add"
 - If user mentions rating, stars, or score after discussing a wine → "rate"
 - If user says "I drank", "I tried", "I had", "I finished" with a wine name → "rate" (they want to log/rate it)
@@ -152,7 +157,7 @@ CELLAR_QUERY_NLP_PROMPT = """Convert the user's natural language cellar query in
 User query: {query}
 
 Extract filters:
-- status: "owned", "tried", "wishlist", or null (all)
+- status: "owned", "tried", or null (all)
 - wine_type: "red", "white", "rosé", "sparkling", or null
 - price_max: number or null
 - price_min: number or null

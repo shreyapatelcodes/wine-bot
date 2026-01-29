@@ -161,11 +161,15 @@ class ContextManager:
             action_type: Type of action (e.g., 'cellar_add', 'cellar_remove', 'rate')
             action_data: Data needed to reverse the action
         """
-        context = session.context or {}
+        # Create a NEW dict to ensure SQLAlchemy detects the change
+        context = dict(session.context or {})
 
         # Initialize actions list if needed
         if "recent_actions" not in context:
             context["recent_actions"] = []
+        else:
+            # Also copy the list to avoid in-place mutation issues
+            context["recent_actions"] = list(context["recent_actions"])
 
         # Add action to front (most recent first)
         context["recent_actions"].insert(0, {
@@ -204,8 +208,9 @@ class ContextManager:
         Returns:
             Action dict or None
         """
-        context = session.context or {}
-        actions = context.get("recent_actions", [])
+        # Create a NEW dict to ensure SQLAlchemy detects the change
+        context = dict(session.context or {})
+        actions = list(context.get("recent_actions", []))
 
         if not actions:
             return None
@@ -229,7 +234,9 @@ class ContextManager:
             session: ChatSession
             updates: Dict of context updates to merge
         """
-        context = session.context or {}
+        # Create a NEW dict to ensure SQLAlchemy detects the change
+        # (SQLAlchemy may not detect in-place mutations to JSON columns)
+        context = dict(session.context or {})
         context.update(updates)
         session.context = context
         self.db.commit()
@@ -313,7 +320,8 @@ class ContextManager:
             message: Original user message
             entities: Extracted entities
         """
-        context = session.context or {}
+        # Create a NEW dict to ensure SQLAlchemy detects the change
+        context = dict(session.context or {})
         context["pending_request"] = {
             "message": message,
             "entities": entities,
@@ -332,7 +340,8 @@ class ContextManager:
         Returns:
             Pending request dict or None
         """
-        context = session.context or {}
+        # Create a NEW dict to ensure SQLAlchemy detects the change
+        context = dict(session.context or {})
         pending = context.pop("pending_request", None)
         if pending:
             session.context = context

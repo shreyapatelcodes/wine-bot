@@ -46,10 +46,9 @@ export function TypingIndicator({ showSkeletonCards = false }: TypingIndicatorPr
           </div>
         </div>
 
-        {/* Skeleton wine cards */}
+        {/* Skeleton wine card */}
         {showSkeletonCards && (
-          <div className="mt-4 space-y-3 w-full">
-            <WineCardSkeleton />
+          <div className="mt-4 w-full">
             <WineCardSkeleton />
           </div>
         )}

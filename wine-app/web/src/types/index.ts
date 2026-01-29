@@ -109,7 +109,6 @@ export interface CellarBottleCreate {
   custom_wine_country?: string;
   custom_wine_metadata?: WineMetadata;
   status?: CellarStatus;
-  quantity?: number;
   purchase_date?: string;
   purchase_price?: number;
   purchase_location?: string;
@@ -119,7 +118,6 @@ export interface CellarBottleCreate {
 
 export interface CellarBottleUpdate {
   status?: CellarStatus;
-  quantity?: number;
   rating?: number;
   tasting_notes?: string;
   tried_date?: string;
@@ -138,7 +136,6 @@ export interface CellarBottle {
   custom_wine_country: string | null;
   custom_wine_metadata: WineMetadata | null;
   status: CellarStatus;
-  quantity: number;
   purchase_date: string | null;
   purchase_price: number | null;
   purchase_location: string | null;
@@ -247,7 +244,6 @@ export interface ChatCard {
   is_saved?: boolean;
   is_in_cellar?: boolean;
   status?: CellarStatus;
-  quantity?: number;
   rating?: number;
   confidence?: number;
 }

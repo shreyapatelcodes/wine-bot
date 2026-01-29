@@ -35,7 +35,6 @@ class CellarAgent:
         varietal: Optional[str] = None,
         region: Optional[str] = None,
         country: Optional[str] = None,
-        quantity: int = 1,
         purchase_price: Optional[float] = None,
         purchase_location: Optional[str] = None,
         status: str = "owned"
@@ -54,16 +53,26 @@ class CellarAgent:
             ).first()
 
             if existing:
-                # Update quantity
-                existing.quantity += quantity
-                self.db.commit()
-                return {
-                    "success": True,
-                    "bottle_id": str(existing.id),
-                    "message": f"Added {quantity} more bottle(s). You now have {existing.quantity}.",
-                    "is_new": False,
-                    "total_quantity": existing.quantity
-                }
+                # If wine was previously "tried", change back to "owned" (re-purchased)
+                # but keep the rating
+                was_tried = existing.status == "tried"
+                if was_tried:
+                    existing.status = "owned"
+                    self.db.commit()
+                    return {
+                        "success": True,
+                        "bottle_id": str(existing.id),
+                        "message": "Added back to your cellar!",
+                        "is_new": False
+                    }
+                else:
+                    # Already in cellar as owned
+                    return {
+                        "success": True,
+                        "bottle_id": str(existing.id),
+                        "message": "This wine is already in your cellar.",
+                        "is_new": False
+                    }
 
         # Create new cellar entry
         cellar_bottle = CellarBottle(
@@ -77,7 +86,6 @@ class CellarAgent:
             custom_wine_region=region if not wine_id else None,
             custom_wine_country=country if not wine_id else None,
             status=status,
-            quantity=quantity,
             purchase_price=purchase_price,
             purchase_location=purchase_location
         )
@@ -97,8 +105,7 @@ class CellarAgent:
             "success": True,
             "bottle_id": str(cellar_bottle.id),
             "message": f"Added {display_name or 'wine'} to your cellar!",
-            "is_new": True,
-            "total_quantity": quantity
+            "is_new": True
         }
 
     def query_cellar(
@@ -131,6 +138,11 @@ class CellarAgent:
         if price_max:
             filters["price_max"] = price_max
 
+        # Default to "owned" status if not explicitly querying tried wines or ratings
+        # This ensures "show me my cellar" only shows owned wines
+        if not filters.get("status") and not filters.get("min_rating") and not filters.get("max_rating"):
+            filters["status"] = "owned"
+
         # Build query
         db_query = self.db.query(CellarBottle).filter(
             CellarBottle.user_id == self.user.id
@@ -141,23 +153,56 @@ class CellarAgent:
 
         bottles = db_query.order_by(CellarBottle.added_at.desc()).all()
 
-        # Apply additional filters in Python (for custom wines)
+        # Apply additional filters in Python (for custom wines and flexible matching)
         filtered_bottles = []
         for bottle in bottles:
-            # Get wine type
-            bottle_type = None
-            bottle_price = None
-
+            # Get wine attributes from catalog wine or custom fields
             if bottle.wine:
                 bottle_type = bottle.wine.wine_type
                 bottle_price = bottle.wine.price_usd
+                bottle_varietal = bottle.wine.varietal
+                bottle_region = bottle.wine.region
+                bottle_country = bottle.wine.country
             else:
                 bottle_type = bottle.custom_wine_type
                 bottle_price = bottle.purchase_price
+                bottle_varietal = bottle.custom_wine_varietal
+                bottle_region = bottle.custom_wine_region
+                bottle_country = bottle.custom_wine_country
 
             # Apply wine type filter
             if filters.get("wine_type"):
                 if not bottle_type or bottle_type.lower() != filters["wine_type"].lower():
+                    continue
+
+            # Apply varietal filter (case-insensitive, partial match)
+            if filters.get("varietal"):
+                filter_varietal = filters["varietal"].lower()
+                if not bottle_varietal or filter_varietal not in bottle_varietal.lower():
+                    continue
+
+            # Apply region filter (case-insensitive, partial match)
+            if filters.get("region"):
+                filter_region = filters["region"].lower()
+                if not bottle_region or filter_region not in bottle_region.lower():
+                    continue
+
+            # Apply country filter (case-insensitive, partial match - also checks region for US states)
+            if filters.get("country"):
+                filter_country = filters["country"].lower()
+                country_match = bottle_country and filter_country in bottle_country.lower()
+                region_match = bottle_region and filter_country in bottle_region.lower()
+                if not (country_match or region_match):
+                    continue
+
+            # Apply minimum rating filter
+            if filters.get("min_rating"):
+                if not bottle.rating or bottle.rating < filters["min_rating"]:
+                    continue
+
+            # Apply maximum rating filter (for wines they didn't like)
+            if filters.get("max_rating"):
+                if not bottle.rating or bottle.rating > filters["max_rating"]:
                     continue
 
             # Apply price filters
@@ -310,16 +355,15 @@ class CellarAgent:
             CellarBottle.user_id == self.user.id
         ).all()
 
-        total_owned = sum(b.quantity for b in bottles if b.status == "owned")
+        total_owned = len([b for b in bottles if b.status == "owned"])
         total_tried = len([b for b in bottles if b.status == "tried"])
-        total_wishlist = len([b for b in bottles if b.status == "wishlist"])
 
         # Type breakdown
         type_counts = {"red": 0, "white": 0, "rosé": 0, "sparkling": 0}
         for bottle in bottles:
             wine_type = bottle.wine.wine_type if bottle.wine else bottle.custom_wine_type
             if wine_type and wine_type.lower() in type_counts:
-                type_counts[wine_type.lower()] += bottle.quantity
+                type_counts[wine_type.lower()] += 1
 
         # Average rating
         rated_bottles = [b for b in bottles if b.rating]
@@ -328,7 +372,6 @@ class CellarAgent:
         return {
             "total_bottles": total_owned,
             "wines_tried": total_tried,
-            "wishlist_count": total_wishlist,
             "type_breakdown": type_counts,
             "average_rating": avg_rating,
             "ratings_count": len(rated_bottles)
@@ -336,22 +379,60 @@ class CellarAgent:
 
     def _parse_cellar_query(self, query: str) -> Dict[str, Any]:
         """Parse natural language cellar query into filters."""
-        prompt = f"""Convert this cellar query into filters.
+        prompt = f"""Convert this cellar query into filters. Extract any relevant criteria the user mentions.
 
 Query: {query}
 
-Extract:
-- status: "owned", "tried", "wishlist", or null
+Extract any of these filters that apply:
+- status: "owned" (wines in cellar), "tried" (wines they've tasted), "saved" (wines they want to try), or null
 - wine_type: "red", "white", "rosé", "sparkling", or null
+- varietal: grape variety like "Chardonnay", "Pinot Noir", "Cabernet Sauvignon", etc. or null
+- region: wine region like "Napa Valley", "Burgundy", "Tuscany", etc. or null
+- country: country like "France", "Italy", "USA", "California", etc. or null
+- min_rating: minimum rating (1-5) for "liked" or "enjoyed" wines, or null
+- max_rating: maximum rating (1-5) for wines they "didn't like" or "weren't a fan of", or null
 - price_min: number or null
 - price_max: number or null
 
+Note: For "liked", "loved", "enjoyed", "favorite" wines, set min_rating to 4.
+Note: For "didn't like", "wasn't a fan", "not great", "disappointing" wines, set max_rating to 3.
+Note: US states like "California", "Oregon", "Washington" should go in country field.
+
+The user has three places for wines:
+1. Cellar (owned): wines they currently have/own
+2. Tried list: wines they've tasted
+3. Want to try (saved): wines they'd like to try in the future
+
 Examples:
 - "my reds" -> {{"wine_type": "red", "status": "owned"}}
-- "wines I've tried" -> {{"status": "tried"}}
-- "under $30" -> {{"price_max": 30}}
+- "what's in my cellar" -> {{"status": "owned"}}
+- "show me my cellar" -> {{"status": "owned"}}
+- "wines I own" -> {{"status": "owned"}}
+- "what have I tried" -> {{"status": "tried"}}
+- "my tried list" -> {{"status": "tried"}}
+- "wines I've tasted" -> {{"status": "tried"}}
+- "what Chardonnays have I tried" -> {{"status": "tried", "varietal": "Chardonnay"}}
+- "Pinot Noirs I've had" -> {{"status": "tried", "varietal": "Pinot Noir"}}
+- "wines I want to try" -> {{"status": "saved"}}
+- "what do I want to try" -> {{"status": "saved"}}
+- "my want to try list" -> {{"status": "saved"}}
+- "saved wines" -> {{"status": "saved"}}
+- "wines to try" -> {{"status": "saved"}}
+- "wines from California I own" -> {{"status": "owned", "country": "California"}}
+- "French wines I've tried" -> {{"status": "tried", "country": "France"}}
+- "Napa Valley reds" -> {{"wine_type": "red", "region": "Napa Valley"}}
+- "what have I liked" -> {{"min_rating": 4}}
+- "wines I've enjoyed" -> {{"min_rating": 4}}
+- "favorite reds" -> {{"wine_type": "red", "min_rating": 4}}
+- "Italian wines I've loved" -> {{"country": "Italy", "min_rating": 4}}
+- "wines I didn't like" -> {{"max_rating": 3}}
+- "what didn't I like" -> {{"max_rating": 3}}
+- "wines I wasn't a fan of" -> {{"max_rating": 3}}
+- "reds I didn't enjoy" -> {{"wine_type": "red", "max_rating": 3}}
+- "disappointing wines" -> {{"max_rating": 3}}
+- "sparkling wines under $50" -> {{"wine_type": "sparkling", "price_max": 50}}
 
-Respond with ONLY JSON:"""
+Respond with ONLY valid JSON, no explanation:"""
 
         try:
             response = self.client.chat.completions.create(
@@ -393,7 +474,6 @@ Respond with ONLY JSON:"""
                 "country": bottle.wine.country,
                 "price_usd": bottle.wine.price_usd,
                 "status": bottle.status,
-                "quantity": bottle.quantity,
                 "rating": bottle.rating,
                 "tasting_notes": bottle.tasting_notes
             }
@@ -409,7 +489,6 @@ Respond with ONLY JSON:"""
                 "country": bottle.custom_wine_country,
                 "price_usd": bottle.purchase_price,
                 "status": bottle.status,
-                "quantity": bottle.quantity,
                 "rating": bottle.rating,
                 "tasting_notes": bottle.tasting_notes
             }

@@ -103,15 +103,24 @@ IMPORTANT ATTRIBUTION RULES:
 5. Do NOT claim the user asked for things they didn't mention (like specific regions, flavor notes, etc.)
 6. Focus on: "You asked for X - this wine delivers Y"
 
+CRITICAL FOR SIMILARITY QUERIES:
+- If user asked for "similar to [wine name]", ONLY say this wine shares characteristics with that wine
+- Do NOT infer preferences like "the depth you're looking for" or "complexity you enjoy"
+- Do NOT attribute preferences based on the characteristics of the reference wine
+- Just describe HOW it's similar, not WHY they supposedly want those characteristics
+
 Your explanation should:
 - Connect wine characteristics ONLY to what user explicitly requested
 - Mention specific wine qualities that match their stated needs
 - Be concise and conversational (1-2 sentences)
 - Avoid generic phrases like "great choice" or "perfect for you"
 
-GOOD example: "You asked for a bold red for steak - this full-bodied Cabernet has rich tannins and dark fruit that complement grilled meat beautifully."
+GOOD example (preference-based): "You asked for a bold red for steak - this full-bodied Cabernet has rich tannins and dark fruit that complement grilled meat beautifully."
+
+GOOD example (similarity-based): "You asked for wines similar to Embrionly - this shares the same rich dark fruit profile and silky tannins from the Saint-Émilion region."
 
 BAD example: "Since you love fruity wines from California..." (if user never said this)
+BAD example: "...provides the depth you're looking for" (if user only asked for similarity, not depth)
 
 Generate the explanation:"""
 
@@ -149,7 +158,9 @@ Wine: {wine_name} ({wine_varietal} from {wine_region})
 Key traits: {characteristics_str}
 Flavors: {flavor_notes_str}
 
-Pattern: "You wanted [what they said] - this [wine quality] delivers [how it matches]."
+CRITICAL: If user asked for "similar to [wine]", only describe HOW it's similar. Do NOT infer preferences like "the depth you want" or "complexity you're looking for".
+
+Pattern: "You wanted [exactly what they said] - this [wine quality] delivers [how it matches]."
 
 Explanation:"""
 

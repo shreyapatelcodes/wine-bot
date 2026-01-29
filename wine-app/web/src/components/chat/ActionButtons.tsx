@@ -14,6 +14,8 @@ import {
   Undo2,
   Check,
   X,
+  CheckCircle,
+  Heart,
 } from 'lucide-react';
 import type { ChatAction, ChatCard } from '../../types';
 
@@ -37,6 +39,8 @@ const actionIcons: Record<string, React.ReactNode> = {
   undo: <Undo2 className="w-3.5 h-3.5" />,
   confirm: <Check className="w-3.5 h-3.5" />,
   cancel: <X className="w-3.5 h-3.5" />,
+  tried: <CheckCircle className="w-3.5 h-3.5" />,
+  want_to_try: <Heart className="w-3.5 h-3.5" />,
 };
 
 export function ActionButtons({

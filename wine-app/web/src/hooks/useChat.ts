@@ -2,8 +2,9 @@
  * Chat hook for managing conversation state with Pip
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import type {
   ChatMessage,
   ChatResponse,
@@ -28,6 +29,7 @@ const CARD_KEYWORDS = [
   'recommend', 'find', 'suggest', 'looking for', 'want a', 'need a',
   'cellar', 'saved', 'my wines', 'what wines',
   'show me', 'what do i have', 'identify', 'scan',
+  'tried', 'want to try', 'wines to try',
 ];
 
 function expectsCardsFromMessage(message: string): boolean {
@@ -39,21 +41,31 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 15);
 }
 
-const WELCOME_MESSAGE: ChatMessage = {
-  id: 'welcome',
-  role: 'assistant',
-  content: "Hey! I'm Pip, your wine guide. I can help you discover wines, answer questions, manage your cellar, or identify bottles from photos. What are you in the mood for?",
-  timestamp: new Date().toISOString(),
-  actions: [
+function createWelcomeMessage(isAuthenticated: boolean): ChatMessage {
+  const baseActions: ChatAction[] = [
     { type: 'recommend', label: 'Find a wine' },
     { type: 'educate', label: 'Learn about wine' },
-    { type: 'cellar', label: 'My cellar' },
     { type: 'photo', label: 'Scan a label' },
-  ],
-};
+  ];
+
+  const authActions: ChatAction[] = [
+    { type: 'cellar', label: 'My Cellar' },
+    { type: 'tried', label: 'Tried' },
+    { type: 'want_to_try', label: 'Want to Try' },
+  ];
+
+  return {
+    id: 'welcome',
+    role: 'assistant',
+    content: "Hey! I'm Pip, your wine guide. I can help you discover wines, answer questions, manage your collection, or identify bottles from photos. What are you in the mood for?",
+    timestamp: new Date().toISOString(),
+    actions: isAuthenticated ? [...baseActions, ...authActions] : baseActions,
+  };
+}
 
 export function useChat(): UseChatReturn {
-  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
+  const { isAuthenticated } = useAuth();
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [createWelcomeMessage(isAuthenticated)]);
   const [isLoading, setIsLoading] = useState(false);
   const [expectsCards, setExpectsCards] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +73,17 @@ export function useChat(): UseChatReturn {
 
   // Track conversation history for context
   const historyRef = useRef<Array<{ role: string; content: string }>>([]);
+
+  // Update welcome message when auth state changes
+  useEffect(() => {
+    setMessages((prev) => {
+      // Only update if the first message is the welcome message
+      if (prev[0]?.id === 'welcome') {
+        return [createWelcomeMessage(isAuthenticated), ...prev.slice(1)];
+      }
+      return prev;
+    });
+  }, [isAuthenticated]);
 
   const addMessage = useCallback((message: ChatMessage) => {
     setMessages((prev) => [...prev, message]);
@@ -157,8 +180,23 @@ export function useChat(): UseChatReturn {
           await sendMessage("I'd like to learn about wine");
           break;
 
+        case 'learn_topic':
+          // The label contains the topic to learn about
+          if (action.label) {
+            await sendMessage(`Tell me about ${action.label}`);
+          }
+          break;
+
         case 'cellar':
           await sendMessage("What's in my cellar?");
+          break;
+
+        case 'tried':
+          await sendMessage("What wines have I tried?");
+          break;
+
+        case 'want_to_try':
+          await sendMessage("What wines do I want to try?");
           break;
 
         case 'photo':
@@ -224,6 +262,64 @@ export function useChat(): UseChatReturn {
           }
           break;
 
+        case 'confirm_tried':
+          await sendMessage('Yes, move it to tried');
+          break;
+
+        case 'keep_owned':
+          await sendMessage('No, keep it in my cellar');
+          break;
+
+        case 'mark_tried':
+          if (cardContext?.wine_name) {
+            await sendMessage(`I tried ${cardContext.wine_name}`);
+          } else {
+            await sendMessage('I tried this wine');
+          }
+          break;
+
+        // Budget selection actions
+        case 'budget_under_20':
+          await sendMessage('Under $20');
+          break;
+        case 'budget_20_40':
+          await sendMessage('$20-40');
+          break;
+        case 'budget_40_plus':
+          await sendMessage('$40+');
+          break;
+        case 'budget_any':
+          await sendMessage('No budget');
+          break;
+
+        // Food pairing actions
+        case 'pairing_meat':
+          await sendMessage('Meat or steak');
+          break;
+        case 'pairing_fish':
+          await sendMessage('Fish or seafood');
+          break;
+        case 'pairing_pasta':
+          await sendMessage('Pasta');
+          break;
+        case 'pairing_none':
+          await sendMessage('No food pairing');
+          break;
+
+        // Wine type actions
+        case 'type_red':
+          await sendMessage('Red wine');
+          break;
+        case 'type_white':
+          await sendMessage('White wine');
+          break;
+        case 'type_rose':
+          await sendMessage('Rosé');
+          break;
+        case 'type_any':
+          await sendMessage('Surprise me');
+          break;
+
         default:
           // For any other action, send it as a message
           if (action.label) {
@@ -235,11 +331,11 @@ export function useChat(): UseChatReturn {
   );
 
   const clearChat = useCallback(() => {
-    setMessages([WELCOME_MESSAGE]);
+    setMessages([createWelcomeMessage(isAuthenticated)]);
     setError(null);
     setSessionId(null);
     historyRef.current = [];
-  }, []);
+  }, [isAuthenticated]);
 
   return {
     messages,

@@ -44,7 +44,6 @@ export function ChatMessage({ message, onSaveWine, onAction }: ChatMessageProps)
               is_in_cellar: card.type === 'cellar' ? true : (card.is_in_cellar || false),
               // Cellar-specific properties
               status: card.status,
-              quantity: card.quantity,
               rating: card.rating,
             };
 
@@ -88,8 +87,8 @@ export function ChatMessage({ message, onSaveWine, onAction }: ChatMessageProps)
                     <ActionButtons
                       actions={[
                         { type: 'tell_more', label: 'Details' },
-                        ...(card.status === 'owned' && (card.quantity ?? 0) > 0
-                          ? [{ type: 'decide', label: 'Drink tonight?' }]
+                        ...(card.status === 'owned'
+                          ? [{ type: 'mark_tried', label: 'I tried this' }]
                           : []),
                         { type: 'remove_bottle', label: 'Remove' },
                       ]}
@@ -163,7 +162,7 @@ export function ChatMessage({ message, onSaveWine, onAction }: ChatMessageProps)
           }`}
         >
           {isUser ? (
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">
+            <p className="text-sm leading-relaxed whitespace-pre-wrap font-serif">
               {message.content}
             </p>
           ) : (
@@ -172,9 +171,9 @@ export function ChatMessage({ message, onSaveWine, onAction }: ChatMessageProps)
                 components={{
                   p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
                   strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
-                  ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-                  ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                  li: ({ children }) => <li className="text-gray-700">{children}</li>,
+                  ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>,
+                  ul: ({ children }) => <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>,
+                  li: ({ children }) => <li className="text-gray-700 [&>p]:inline [&>p]:m-0">{children}</li>,
                 }}
               >
                 {message.content}

@@ -1,5 +1,5 @@
 /**
- * Hook for managing saved bottles (wishlist)
+ * Hook for managing saved bottles
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';

@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react';
-import { Wine, Package, CheckCircle, Bookmark, Loader2 } from 'lucide-react';
+import { Wine, Package, CheckCircle, Loader2 } from 'lucide-react';
 import { BottomSheet } from './BottomSheet';
 import type { Wine as WineType, CellarStatus } from '../../types';
 
@@ -31,10 +31,10 @@ const statusOptions: StatusOption[] = [
     color: 'text-blue-600 bg-blue-50 border-blue-200',
   },
   {
-    value: 'wishlist',
-    label: 'Saved',
-    description: 'I want to try this later',
-    icon: <Bookmark className="w-5 h-5" />,
+    value: 'want_to_try',
+    label: 'Want to Try',
+    description: 'Add to my list to try later',
+    icon: <Wine className="w-5 h-5" />,
     color: 'text-purple-600 bg-purple-50 border-purple-200',
   },
 ];
@@ -48,7 +48,7 @@ interface SaveBottomSheetProps {
 }
 
 export function SaveBottomSheet({ isOpen, onClose, wine, onSave, isSaving }: SaveBottomSheetProps) {
-  const [selectedStatus, setSelectedStatus] = useState<CellarStatus>('wishlist');
+  const [selectedStatus, setSelectedStatus] = useState<CellarStatus>('owned');
 
   const handleSave = async () => {
     if (!wine) return;

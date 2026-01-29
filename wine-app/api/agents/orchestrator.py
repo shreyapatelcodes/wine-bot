@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from config import Config
 from models.database import User, ChatSession, Wine, CellarBottle, SavedBottle
 from agents.context_manager import ContextManager
+from agents.cellar_agent import CellarAgent
 from agents.prompts import (
     INTENT_CLASSIFICATION_PROMPT,
     ENTITY_EXTRACTION_PROMPT,
@@ -142,6 +143,161 @@ class ChatOrchestrator:
                     response=response_text,
                     intent="cellar_remove"
                 )
+
+        # Check for pending move to tried confirmation
+        # Refresh session to get latest context
+        self.db.refresh(session)
+        session_context = session.context or {}
+        pending_move = session_context.get("pending_move_to_tried")
+        if pending_move:
+            is_confirmation = any(word in message_lower for word in ["yes", "move", "tried", "finished", "done"])
+            is_cancellation = any(word in message_lower for word in ["no", "keep", "cellar", "cancel"])
+
+            if is_confirmation:
+                bottle_id_str = pending_move.get("bottle_id")
+                try:
+                    bottle_id = uuid.UUID(bottle_id_str)
+                except (ValueError, TypeError):
+                    bottle_id = None
+
+                bottle = self.db.query(CellarBottle).filter(
+                    CellarBottle.id == bottle_id,
+                    CellarBottle.user_id == self.user.id
+                ).first() if bottle_id else None
+
+                if bottle:
+                    wine_name = pending_move.get("wine_name", "this wine")
+                    bottle.status = "tried"
+                    self.db.commit()
+
+                    # Clear pending move
+                    self.context_manager.update_session_context(session, {"pending_move_to_tried": None})
+
+                    response_text = f"Moved {wine_name} to your tried wines."
+                    self.context_manager.add_message(session, "assistant", response_text)
+
+                    return self._build_response(
+                        session=session,
+                        response=response_text,
+                        intent="rate"
+                    )
+
+            elif is_cancellation:
+                # Clear pending move
+                self.context_manager.update_session_context(session, {"pending_move_to_tried": None})
+
+                wine_name = pending_move.get("wine_name", "this wine")
+                response_text = f"No problem, {wine_name} will stay in your cellar."
+                self.context_manager.add_message(session, "assistant", response_text)
+
+                return self._build_response(
+                    session=session,
+                    response=response_text,
+                    intent="rate"
+                )
+
+        # Check for recommendation preference gathering flow
+        # Refresh session to get latest context
+        self.db.refresh(session)
+        session_context = session.context or {}
+        gathering_prefs = session_context.get("gathering_recommendation_prefs")
+        if gathering_prefs:
+            # Create a copy to ensure SQLAlchemy detects changes
+            rec_prefs = dict(session_context.get("recommendation_prefs", {}))
+
+            # Check for budget responses
+            if any(word in message_lower for word in ["under 20", "under $20", "budget_under_20"]):
+                rec_prefs["price_max"] = 20
+            elif any(word in message_lower for word in ["20-40", "$20-40", "20 to 40", "budget_20_40"]):
+                rec_prefs["price_min"] = 20
+                rec_prefs["price_max"] = 40
+            elif any(word in message_lower for word in ["40+", "$40+", "over 40", "above 40", "budget_40_plus"]):
+                rec_prefs["price_min"] = 40
+            elif any(word in message_lower for word in ["no budget", "any budget", "doesn't matter", "budget_any"]):
+                pass  # No price constraint
+
+            # If we just got budget, ask about food pairing
+            if "food_pairing" not in rec_prefs and "asked_food" not in rec_prefs:
+                rec_prefs["asked_food"] = True
+                self.context_manager.update_session_context(session, {"recommendation_prefs": rec_prefs})
+
+                response_text = "Got it! **Are you pairing this with any food?** (or just tell me what you're eating)"
+                self.context_manager.add_message(session, "assistant", response_text)
+
+                return self._build_response(
+                    session=session,
+                    response=response_text,
+                    intent="recommend",
+                    actions=[
+                        {"type": "pairing_meat", "label": "Meat/Steak"},
+                        {"type": "pairing_fish", "label": "Fish/Seafood"},
+                        {"type": "pairing_pasta", "label": "Pasta"},
+                        {"type": "pairing_none", "label": "No pairing"},
+                    ]
+                )
+
+            # Check for food pairing responses
+            if "asked_food" in rec_prefs and "food_pairing" not in rec_prefs:
+                if any(word in message_lower for word in ["meat", "steak", "beef", "pairing_meat"]):
+                    rec_prefs["food_pairing"] = "steak"
+                elif any(word in message_lower for word in ["fish", "seafood", "pairing_fish"]):
+                    rec_prefs["food_pairing"] = "seafood"
+                elif any(word in message_lower for word in ["pasta", "italian", "pairing_pasta"]):
+                    rec_prefs["food_pairing"] = "pasta"
+                elif any(word in message_lower for word in ["no pairing", "no food", "just drinking", "pairing_none", "none"]):
+                    rec_prefs["food_pairing"] = None
+                else:
+                    # Use whatever they said as the pairing
+                    rec_prefs["food_pairing"] = message
+
+                # Ask about wine type preference
+                rec_prefs["asked_type"] = True
+                self.context_manager.update_session_context(session, {"recommendation_prefs": rec_prefs})
+
+                response_text = "Perfect! **Any preference for red, white, or something else?** (you can also say sparkling, natural, etc.)"
+                self.context_manager.add_message(session, "assistant", response_text)
+
+                return self._build_response(
+                    session=session,
+                    response=response_text,
+                    intent="recommend",
+                    actions=[
+                        {"type": "type_red", "label": "Red"},
+                        {"type": "type_white", "label": "White"},
+                        {"type": "type_rose", "label": "Rosé"},
+                        {"type": "type_any", "label": "Surprise me"},
+                    ]
+                )
+
+            # Check for wine type responses
+            if "asked_type" in rec_prefs:
+                if any(word in message_lower for word in ["red", "type_red"]):
+                    rec_prefs["wine_type"] = "red"
+                elif any(word in message_lower for word in ["white", "type_white"]):
+                    rec_prefs["wine_type"] = "white"
+                elif any(word in message_lower for word in ["rosé", "rose", "type_rose"]):
+                    rec_prefs["wine_type"] = "rosé"
+                elif any(word in message_lower for word in ["sparkling", "champagne", "bubbly"]):
+                    rec_prefs["wine_type"] = "sparkling"
+                elif any(word in message_lower for word in ["natural", "orange", "skin contact"]):
+                    rec_prefs["wine_type"] = "natural"
+                # "surprise me" or "any" means no type preference
+
+                # Done gathering - clear the flag and proceed with recommendations
+                self.context_manager.update_session_context(session, {
+                    "gathering_recommendation_prefs": None,
+                    "recommendation_prefs": rec_prefs
+                })
+
+                # Build description from gathered prefs
+                description_parts = []
+                if rec_prefs.get("wine_type"):
+                    description_parts.append(rec_prefs["wine_type"])
+                if rec_prefs.get("food_pairing"):
+                    description_parts.append(f"for {rec_prefs['food_pairing']}")
+                description = " ".join(description_parts) if description_parts else "wine recommendation"
+
+                return self._handle_recommend(session, description, rec_prefs)
 
         # Check for pending request clarification response
         if "recommend something new" in message_lower or "new" in message_lower and "recommend" in message_lower:
@@ -359,10 +515,72 @@ Current user message: {message}
         entities: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Handle wine recommendation requests."""
+        # Check if this is a vague request that needs more info
+        has_price = entities.get("price_min") or entities.get("price_max")
+        has_food = entities.get("food_pairing")
+        has_type = entities.get("wine_type")
+        has_characteristics = entities.get("characteristics")
+        has_occasion = entities.get("occasion")
+
+        # Check for stored preferences from follow-up questions
+        session_context = session.context or {}
+        stored_prefs = session_context.get("recommendation_prefs", {})
+
+        # Merge stored prefs with current entities
+        if stored_prefs:
+            if not has_price and stored_prefs.get("price_max"):
+                entities["price_max"] = stored_prefs["price_max"]
+                has_price = True
+            if not has_food and stored_prefs.get("food_pairing"):
+                entities["food_pairing"] = stored_prefs["food_pairing"]
+                has_food = True
+            if not has_type and stored_prefs.get("wine_type"):
+                entities["wine_type"] = stored_prefs["wine_type"]
+                has_type = True
+            # Clear stored prefs after using them
+            self.context_manager.update_session_context(session, {"recommendation_prefs": None})
+
+        # If request is too vague, ask clarifying questions
+        is_vague = not has_price and not has_food and not has_type and not has_characteristics and not has_occasion
+        message_lower = message.lower()
+        is_generic = any(phrase in message_lower for phrase in [
+            "find a wine", "find me a wine", "recommend", "help me find",
+            "suggest a wine", "wine recommendation", "what wine"
+        ]) and len(message.split()) < 8
+
+        if is_vague and is_generic:
+            response_text = "I'd love to help you find the perfect wine! Let me ask a few questions:\n\n**What's your budget?**"
+            self.context_manager.add_message(session, "assistant", response_text)
+
+            # Store that we're in recommendation gathering mode
+            self.context_manager.update_session_context(session, {
+                "gathering_recommendation_prefs": True,
+                "recommendation_prefs": {}
+            })
+
+            return self._build_response(
+                session=session,
+                response=response_text,
+                intent="recommend",
+                actions=[
+                    {"type": "budget_under_20", "label": "Under $20"},
+                    {"type": "budget_20_40", "label": "$20-40"},
+                    {"type": "budget_40_plus", "label": "$40+"},
+                    {"type": "budget_any", "label": "No budget"},
+                ]
+            )
+
         # Import here to avoid circular imports
         from app import _get_recommender
 
         get_recommendations, UserPreferences = _get_recommender()
+
+        # Extract explicit filters for post-filtering
+        filter_varietal = entities.get("varietal")
+        filter_region = entities.get("region")
+        filter_country = entities.get("country")
+        filter_wine_type = entities.get("wine_type")
+        has_explicit_filters = any([filter_varietal, filter_region, filter_country, filter_wine_type])
 
         # Build preferences from entities
         user_prefs = UserPreferences(
@@ -370,11 +588,13 @@ Current user message: {message}
             budget_min=entities.get("price_min", 10.0),
             budget_max=entities.get("price_max", 200.0),
             food_pairing=entities.get("food_pairing"),
-            wine_type_pref=entities.get("wine_type")
+            wine_type_pref=filter_wine_type
         )
 
         try:
-            recommendations = get_recommendations(user_prefs, top_n=3)
+            # Get more recommendations if we need to filter
+            fetch_count = 15 if has_explicit_filters else 3
+            recommendations = get_recommendations(user_prefs, top_n=fetch_count)
         except Exception as e:
             print(f"Recommendation error: {e}")
             return self._build_response(
@@ -384,8 +604,95 @@ Current user message: {message}
                 error=str(e)
             )
 
+        # Helper to determine if a wine is sparkling (handles Champagne, Prosecco, etc.)
+        def is_sparkling_wine(wine) -> bool:
+            # Check explicit wine_type
+            if (wine.wine_type or "").lower() == "sparkling":
+                return True
+
+            # Sparkling wine regions
+            sparkling_regions = [
+                "champagne", "prosecco", "cava", "franciacorta", "crémant", "cremant",
+                "lambrusco", "asti", "trento", "alto adige"
+            ]
+            # Sparkling wine terms (in name or description)
+            sparkling_terms = [
+                "champagne", "prosecco", "cava", "brut", "sparkling", "spumante",
+                "crémant", "cremant", "lambrusco", "sekt", "espumante", "espumoso",
+                "asti", "moscato d'asti", "frizzante", "pétillant", "petillant",
+                "méthode traditionnelle", "methode traditionnelle", "cap classique",
+                "blanc de blancs", "blanc de noirs", "extra brut", "demi-sec"
+            ]
+
+            region_lower = (wine.region or "").lower()
+            if any(r in region_lower for r in sparkling_regions):
+                return True
+
+            name_lower = (wine.name or "").lower()
+            if any(s in name_lower for s in sparkling_terms):
+                return True
+
+            return False
+
+        # Apply explicit filters if specified
+        if has_explicit_filters and recommendations:
+            filtered_recs = []
+            for rec in recommendations:
+                wine = rec.wine
+
+                # Check wine type (with special handling for sparkling)
+                if filter_wine_type:
+                    filter_type_lower = filter_wine_type.lower()
+                    wine_type_lower = (wine.wine_type or "").lower()
+                    if filter_type_lower == "sparkling":
+                        # Use smart sparkling detection
+                        if not is_sparkling_wine(wine):
+                            continue
+                    elif filter_type_lower not in wine_type_lower:
+                        continue
+
+                # Check varietal (case-insensitive partial match)
+                if filter_varietal:
+                    wine_varietal = (wine.varietal or "").lower()
+                    if filter_varietal.lower() not in wine_varietal:
+                        continue
+
+                # Check region (case-insensitive partial match)
+                if filter_region:
+                    wine_region = (wine.region or "").lower()
+                    if filter_region.lower() not in wine_region:
+                        continue
+
+                # Check country (also check region for US states)
+                if filter_country:
+                    filter_lower = filter_country.lower()
+                    wine_country = (wine.country or "").lower()
+                    wine_region = (wine.region or "").lower()
+                    if filter_lower not in wine_country and filter_lower not in wine_region:
+                        continue
+
+                filtered_recs.append(rec)
+                if len(filtered_recs) >= 3:
+                    break
+
+            recommendations = filtered_recs
+
         if not recommendations:
-            response_text = "I couldn't find wines matching those exact criteria. Try broadening your search - maybe a wider price range or different style?"
+            # Build helpful message based on what filters were applied
+            filter_parts = []
+            if filter_varietal:
+                filter_parts.append(filter_varietal)
+            if filter_region:
+                filter_parts.append(f"from {filter_region}")
+            if filter_country:
+                filter_parts.append(f"from {filter_country}")
+
+            if filter_parts:
+                filter_desc = " ".join(filter_parts)
+                response_text = f"I couldn't find any {filter_desc} wines matching your criteria. Try broadening your search or checking a different region or varietal?"
+            else:
+                response_text = "I couldn't find wines matching those exact criteria. Try broadening your search - maybe a wider price range or different style?"
+
             self.context_manager.add_message(session, "assistant", response_text)
             return self._build_response(
                 session=session,
@@ -393,8 +700,22 @@ Current user message: {message}
                 intent="recommend"
             )
 
-        # Build response with wine cards
-        response_text = f"I found {len(recommendations)} wines that should work well:"
+        # Build response with wine cards - describe what we found
+        filter_parts = []
+        if filter_varietal:
+            filter_parts.append(filter_varietal)
+        if filter_wine_type and not filter_varietal:
+            filter_parts.append(filter_wine_type)
+        if filter_region:
+            filter_parts.append(f"from {filter_region}")
+        elif filter_country:
+            filter_parts.append(f"from {filter_country}")
+
+        if filter_parts:
+            filter_desc = " ".join(filter_parts)
+            response_text = f"Here are {len(recommendations)} {filter_desc} wines I'd recommend:"
+        else:
+            response_text = f"I found {len(recommendations)} wines that should work well:"
 
         # Get user's saved/cellar wine IDs
         saved_ids, cellar_ids = self._get_user_wine_ids()
@@ -453,6 +774,13 @@ Current user message: {message}
         message: str
     ) -> Dict[str, Any]:
         """Handle general wine education questions."""
+        # Check if this is a general "learn about wine" request vs a specific question
+        message_lower = message.lower()
+        is_general_learning = any(phrase in message_lower for phrase in [
+            "learn about wine", "teach me", "wine education", "learn wine",
+            "want to learn", "like to learn", "new to wine", "wine basics"
+        ])
+
         # Search WSET knowledge base
         try:
             knowledge_chunks = search_wset_knowledge(message, top_k=3)
@@ -473,10 +801,22 @@ Current user message: {message}
 
         self.context_manager.add_message(session, "assistant", response_text)
 
+        # Add educational topic suggestions for general learning requests
+        actions = None
+        if is_general_learning:
+            actions = [
+                {"type": "learn_topic", "label": "Red vs White"},
+                {"type": "learn_topic", "label": "How to Taste Wine"},
+                {"type": "learn_topic", "label": "Food Pairings"},
+                {"type": "learn_topic", "label": "Wine Regions"},
+                {"type": "learn_topic", "label": "Reading a Label"},
+            ]
+
         return self._build_response(
             session=session,
             response=response_text,
-            intent="educate_general"
+            intent="educate_general",
+            actions=actions
         )
 
     def _handle_education_specific(
@@ -598,71 +938,32 @@ Provide helpful information about this wine. Be conversational and informative."
                 requires_auth=True
             )
 
-        # Check if user is asking about saved/wishlist wines or rated wines
+        # Check if user is asking about wines they want to try
         message_lower = message.lower()
-        is_saved_query = any(word in message_lower for word in ['saved', 'wishlist', 'want to try', 'to try'])
-        is_rated_query = any(phrase in message_lower for phrase in [
-            'liked', 'rated', 'enjoyed', 'my ratings', 'have i liked', 'have i rated',
-            'wines i\'ve tried', 'wines i tried', 'what did i rate', 'past ratings'
-        ])
-
-        # Handle rated/liked wines query
-        if is_rated_query:
-            rated_bottles = self.db.query(CellarBottle).filter(
-                CellarBottle.user_id == self.user.id,
-                CellarBottle.rating.isnot(None)
-            ).order_by(CellarBottle.rating.desc()).limit(10).all()
-
-            if not rated_bottles:
-                response_text = "You haven't rated any wines yet. After you try a wine, let me know and I'll ask you to rate it!"
-                self.context_manager.add_message(session, "assistant", response_text)
-                return self._build_response(
-                    session=session,
-                    response=response_text,
-                    intent="cellar_query"
-                )
-
-            response_text = f"Here are the wines you've rated:"
-
-            cards = []
-            for bottle in rated_bottles[:5]:
-                card = self._bottle_to_card(bottle)
-                cards.append(card)
-
-            self.context_manager.add_message(session, "assistant", response_text)
-
-            return self._build_response(
-                session=session,
-                response=response_text,
-                intent="cellar_query",
-                cards=cards
-            )
+        is_saved_query = any(phrase in message_lower for phrase in ['saved', 'want to try', 'to try', 'wines to try', 'try list'])
 
         # Get status from entities or infer from message
         status = entities.get("status")
-        if status is None:
-            if is_saved_query:
-                status = "saved"
-            else:
-                status = "owned"
+        if status is None and is_saved_query:
+            status = "saved"
 
-        # Query SavedBottle table for saved/wishlist wines
+        # Query SavedBottle table for saved wines
         if status == "saved":
             saved_bottles = self.db.query(SavedBottle).filter(
                 SavedBottle.user_id == self.user.id
             ).order_by(SavedBottle.saved_at.desc()).limit(10).all()
 
             if not saved_bottles:
-                response_text = "You haven't saved any wines yet. When I recommend wines, you can save the ones you want to try!"
+                response_text = "You haven't added any wines to try yet. When I recommend wines, you can add the ones you'd like to try!"
                 self.context_manager.add_message(session, "assistant", response_text)
                 return self._build_response(
                     session=session,
                     response=response_text,
                     intent="cellar_query",
-                    actions=[{"type": "recommend", "label": "Find wines to save"}]
+                    actions=[{"type": "recommend", "label": "Find wines to try"}]
                 )
 
-            response_text = f"You have {len(saved_bottles)} saved wine{'s' if len(saved_bottles) > 1 else ''}:"
+            response_text = f"Here are {len(saved_bottles)} wine{'s' if len(saved_bottles) > 1 else ''} you want to try:"
 
             cards = []
             for saved in saved_bottles[:5]:
@@ -678,43 +979,12 @@ Provide helpful information about this wine. Be conversational and informative."
                 cards=cards
             )
 
-        # Build query filters for CellarBottle
-        query = self.db.query(CellarBottle).filter(
-            CellarBottle.user_id == self.user.id
-        )
+        # Use CellarAgent for flexible, LLM-based query parsing
+        cellar_agent = CellarAgent(self.db, self.user)
+        result = cellar_agent.query_cellar(query=message, limit=10)
 
-        # Apply filters from entities
-        wine_type = entities.get("wine_type")
-        price_max = entities.get("price_max")
-
-        if status:
-            query = query.filter(CellarBottle.status == status)
-
-        bottles = query.order_by(CellarBottle.added_at.desc()).limit(10).all()
-
-        # Filter by wine type and price in Python (since some are custom entries)
-        filtered_bottles = []
-        for bottle in bottles:
-            # Get wine type
-            bottle_type = None
-            bottle_price = None
-            if bottle.wine:
-                bottle_type = bottle.wine.wine_type
-                bottle_price = bottle.wine.price_usd
-            elif bottle.custom_wine_type:
-                bottle_type = bottle.custom_wine_type
-                bottle_price = bottle.purchase_price
-
-            # Apply filters
-            if wine_type and bottle_type and bottle_type.lower() != wine_type.lower():
-                continue
-            if price_max and bottle_price and bottle_price > price_max:
-                continue
-
-            filtered_bottles.append(bottle)
-
-        if not filtered_bottles:
-            response_text = "Your cellar is empty for those criteria. Want to find some wines to add?"
+        if not result["bottles"]:
+            response_text = "No wines found matching that criteria. Want to find some wines to add?"
             self.context_manager.add_message(session, "assistant", response_text)
             return self._build_response(
                 session=session,
@@ -723,12 +993,62 @@ Provide helpful information about this wine. Be conversational and informative."
                 actions=[{"type": "recommend", "label": "Find wines"}]
             )
 
-        response_text = f"You have {len(filtered_bottles)} wine{'s' if len(filtered_bottles) > 1 else ''} matching that:"
+        # Build response text based on filters applied
+        filters = result.get("filters_applied", {})
+        count = result["count"]
 
+        # Generate a natural response based on what was queried
+        # Build wine descriptor (varietal, type, origin)
+        wine_desc_parts = []
+        if filters.get("varietal"):
+            wine_desc_parts.append(filters["varietal"])
+        if filters.get("wine_type") and not filters.get("varietal"):
+            wine_desc_parts.append(filters["wine_type"])
+        if filters.get("region"):
+            wine_desc_parts.append(f"from {filters['region']}")
+        elif filters.get("country"):
+            wine_desc_parts.append(f"from {filters['country']}")
+
+        wine_desc = " ".join(wine_desc_parts) if wine_desc_parts else ""
+
+        # Build rating descriptor
+        rating_desc = ""
+        if filters.get("min_rating"):
+            rating_desc = "you've enjoyed"
+        elif filters.get("max_rating"):
+            rating_desc = "you weren't a fan of"
+
+        # Build status descriptor
+        status_desc = ""
+        if filters.get("status") == "tried":
+            status_desc = "tried"
+        elif filters.get("status") == "owned":
+            status_desc = "own"
+
+        # Construct natural response
+        if wine_desc and rating_desc:
+            response_text = f"Here are the {wine_desc} wines {rating_desc}:"
+        elif wine_desc and status_desc:
+            response_text = f"Here are the {wine_desc} wines you've {status_desc}:"
+        elif rating_desc:
+            response_text = f"Here are the wines {rating_desc}:"
+        elif status_desc:
+            response_text = f"Here are the wines you've {status_desc}:"
+        elif wine_desc:
+            response_text = f"Here are your {wine_desc} wines:"
+        else:
+            response_text = f"Here are your wines:"
+
+        # Convert results to cards
         cards = []
-        for bottle in filtered_bottles[:5]:
-            card = self._bottle_to_card(bottle)
-            cards.append(card)
+        for bottle_data in result["bottles"][:5]:
+            # Query the actual bottle to use _bottle_to_card
+            bottle = self.db.query(CellarBottle).filter(
+                CellarBottle.id == bottle_data["bottle_id"]
+            ).first()
+            if bottle:
+                card = self._bottle_to_card(bottle)
+                cards.append(card)
 
         self.context_manager.add_message(session, "assistant", response_text)
 
@@ -754,18 +1074,69 @@ Provide helpful information about this wine. Be conversational and informative."
                 requires_auth=True
             )
 
-        # Get recent wine references
-        wine_refs = self.context_manager.get_recent_wine_references(session)
+        wine_ref = None
+        wine_id = None
 
-        if not wine_refs:
+        # First, try to find wine name mentioned in the message
+        message_lower = message.lower()
+        search_text = re.sub(r"['\"\-]", " ", message_lower)
+
+        # Search in saved wines first
+        saved_bottles = self.db.query(SavedBottle).filter(
+            SavedBottle.user_id == self.user.id
+        ).all()
+
+        best_match_score = 0
+        best_match_wine = None
+
+        for saved in saved_bottles:
+            wine = saved.wine
+            if wine:
+                name_lower = wine.name.lower()
+                name_clean = re.sub(r"['\"\-]", " ", name_lower)
+                name_words = [w for w in name_clean.split() if len(w) > 2]
+                if name_words:
+                    matches = sum(1 for word in name_words if word in search_text)
+                    match_score = matches / len(name_words)
+                    if match_score >= 0.5 and matches > best_match_score:
+                        best_match_score = matches
+                        best_match_wine = wine
+
+        # Also search all wines in database if no saved match
+        if not best_match_wine:
+            all_wines = self.db.query(Wine).all()
+            for wine in all_wines:
+                name_lower = wine.name.lower()
+                name_clean = re.sub(r"['\"\-]", " ", name_lower)
+                name_words = [w for w in name_clean.split() if len(w) > 2]
+                if name_words:
+                    matches = sum(1 for word in name_words if word in search_text)
+                    match_score = matches / len(name_words)
+                    if match_score >= 0.5 and matches > best_match_score:
+                        best_match_score = matches
+                        best_match_wine = wine
+
+        if best_match_wine:
+            wine_ref = {
+                "wine_id": best_match_wine.id,
+                "wine_name": best_match_wine.name,
+                "producer": best_match_wine.producer
+            }
+            wine_id = best_match_wine.id
+
+        # Fall back to recent wine references from session
+        if not wine_ref:
+            wine_refs = self.context_manager.get_recent_wine_references(session)
+            if wine_refs:
+                wine_ref = wine_refs[0]
+                wine_id = wine_ref.get("wine_id")
+
+        if not wine_ref:
             return self._build_response(
                 session=session,
                 response="Which wine would you like to add? Tell me the name or let's find one first.",
                 intent="cellar_add"
             )
-
-        wine_ref = wine_refs[0]
-        wine_id = wine_ref.get("wine_id")
 
         if wine_id:
             # Check if already in cellar
@@ -998,33 +1369,77 @@ Provide helpful information about this wine. Be conversational and informative."
         search_text = message.lower()
         for msg in history[-4:]:  # Check last 4 messages
             search_text += " " + msg.get("content", "").lower()
+        # Clean up special characters for better matching
+        search_text = re.sub(r"['\"\-]", " ", search_text)
 
-        # Try to match against cellar bottles first
+        # Try to match against cellar bottles first - find BEST match, not first
+        best_match_score = 0
+        best_match_bottle = None
+        best_match_name = None
+
         for b in all_bottles:
             bottle_wine_name = b.wine.name if b.wine else b.custom_wine_name
             if bottle_wine_name:
                 name_lower = bottle_wine_name.lower()
-                name_words = [w for w in name_lower.split() if len(w) > 3]
+                # Clean up special characters for matching
+                name_clean = re.sub(r"['\"\-]", " ", name_lower)
+                name_words = [w for w in name_clean.split() if len(w) > 2]
                 if name_words:
                     matches = sum(1 for word in name_words if word in search_text)
-                    if matches >= len(name_words) * 0.4:  # At least 40% match
-                        cellar_bottle = b
-                        wine_name = bottle_wine_name
-                        break
+                    match_score = matches / len(name_words)
+                    # Must be at least 40% match and better than previous best
+                    if match_score >= 0.4 and matches > best_match_score:
+                        best_match_score = matches
+                        best_match_bottle = b
+                        best_match_name = bottle_wine_name
+
+        if best_match_bottle:
+            cellar_bottle = best_match_bottle
+            wine_name = best_match_name
 
         # If no cellar match, try to match against all wines in database
         if not cellar_bottle:
+            best_match_score = 0
             for w in all_wines:
                 name_lower = w.name.lower()
-                name_words = [word for word in name_lower.split() if len(word) > 3]
+                name_clean = re.sub(r"['\"\-]", " ", name_lower)
+                name_words = [word for word in name_clean.split() if len(word) > 2]
                 if name_words:
                     matches = sum(1 for word in name_words if word in search_text)
-                    if matches >= len(name_words) * 0.4:
+                    match_score = matches / len(name_words)
+                    if match_score >= 0.4 and matches > best_match_score:
+                        best_match_score = matches
                         wine_id = w.id
                         wine_name = w.name
-                        break
 
-        # Fall back to recent wine references if no match found
+        # Fall back to recent wine from session context first
+        if not cellar_bottle and not wine_id:
+            session_context = session.context or {}
+            recent_wine = session_context.get("recent_wine")
+            if recent_wine:
+                wine_id = recent_wine.get("wine_id")
+                wine_name = recent_wine.get("wine_name")
+                bottle_id_str = recent_wine.get("bottle_id")
+
+                # Try to find by bottle_id first (most accurate)
+                if bottle_id_str:
+                    try:
+                        bottle_id = uuid.UUID(bottle_id_str)
+                        cellar_bottle = self.db.query(CellarBottle).filter(
+                            CellarBottle.id == bottle_id,
+                            CellarBottle.user_id == self.user.id
+                        ).first()
+                    except (ValueError, TypeError):
+                        pass
+
+                # Fall back to wine_id
+                if not cellar_bottle and wine_id:
+                    cellar_bottle = self.db.query(CellarBottle).filter(
+                        CellarBottle.user_id == self.user.id,
+                        CellarBottle.wine_id == wine_id
+                    ).first()
+
+        # Fall back to message metadata references
         if not cellar_bottle and not wine_id:
             wine_refs = self.context_manager.get_recent_wine_references(session)
             if wine_refs:
@@ -1060,31 +1475,28 @@ Provide helpful information about this wine. Be conversational and informative."
                 CellarBottle.wine_id == wine_id
             ).first()
 
-        # If user consumed wine but no rating yet, mark as tried and ask for rating
+        # If user consumed wine but no rating yet, ask for rating (don't move to tried yet)
         if user_consumed and rating is None:
             if cellar_bottle:
-                # Update existing bottle to tried
-                if cellar_bottle.status == "owned":
-                    cellar_bottle.status = "tried"
-                    self.db.commit()
-
-                # Store wine reference for when they provide rating
+                # Store wine reference and mark that user consumed it
                 self.context_manager.update_session_context(session, {
                     "recent_wine": {
                         "wine_id": str(cellar_bottle.wine_id) if cellar_bottle.wine_id else None,
-                        "wine_name": wine_name
+                        "wine_name": wine_name,
+                        "bottle_id": str(cellar_bottle.id),
+                        "user_consumed": True
                     }
                 })
 
                 response_text = f"Nice! How would you rate {wine_name} out of 5?"
             else:
-                # Wine not in cellar, create tried entry without rating
+                # Wine not in cellar, create entry but keep as "owned" until they confirm
                 cellar_bottle = CellarBottle(
                     user_id=self.user.id,
                     wine_id=wine_id,
                     custom_wine_name=wine_name if not wine_id else None,
-                    status="tried",
-                    quantity=0
+                    status="owned",
+                    quantity=1
                 )
                 self.db.add(cellar_bottle)
                 self.db.commit()
@@ -1092,11 +1504,13 @@ Provide helpful information about this wine. Be conversational and informative."
                 self.context_manager.update_session_context(session, {
                     "recent_wine": {
                         "wine_id": str(wine_id) if wine_id else None,
-                        "wine_name": wine_name
+                        "wine_name": wine_name,
+                        "bottle_id": str(cellar_bottle.id),
+                        "user_consumed": True
                     }
                 })
 
-                response_text = f"Added {wine_name} to your tried wines! How would you rate it out of 5?"
+                response_text = f"Added {wine_name} to your cellar! How would you rate it out of 5?"
 
             self.context_manager.add_message(session, "assistant", response_text)
             return self._build_response(
@@ -1120,8 +1534,9 @@ Provide helpful information about this wine. Be conversational and informative."
             )
 
         # We have a rating - save it
+        was_owned = False
         if not cellar_bottle:
-            # Create a "tried" entry
+            # Create a "tried" entry (new wine, not owned)
             cellar_bottle = CellarBottle(
                 user_id=self.user.id,
                 wine_id=wine_id,
@@ -1133,21 +1548,38 @@ Provide helpful information about this wine. Be conversational and informative."
             self.db.add(cellar_bottle)
         else:
             cellar_bottle.rating = rating
-            if cellar_bottle.status == "owned":
-                cellar_bottle.status = "tried"
+            was_owned = cellar_bottle.status == "owned"
+            # Don't automatically move to tried - ask first
 
         self.db.commit()
 
         wine_name = wine_name or "this wine"
-        response_text = f"Got it! Rated {wine_name} {rating}/5."
 
-        # Store wine reference for potential removal
-        self.context_manager.update_session_context(session, {
-            "recent_wine": {
-                "wine_id": str(cellar_bottle.wine_id) if cellar_bottle.wine_id else None,
-                "wine_name": wine_name
-            }
-        })
+        # If this was an owned bottle, ask if they want to move to tried
+        if was_owned:
+            response_text = f"Got it! Rated {wine_name} {rating}/5. Are you finished with this bottle? Shall I move it to the tried section?"
+
+            # Store pending move for confirmation
+            self.context_manager.update_session_context(session, {
+                "pending_move_to_tried": {
+                    "bottle_id": str(cellar_bottle.id),
+                    "wine_name": wine_name
+                }
+            })
+
+            self.context_manager.add_message(session, "assistant", response_text)
+
+            return self._build_response(
+                session=session,
+                response=response_text,
+                intent="rate",
+                actions=[
+                    {"type": "confirm_tried", "label": "Yes, move to tried"},
+                    {"type": "keep_owned", "label": "No, keep in cellar"},
+                ]
+            )
+
+        response_text = f"Got it! Rated {wine_name} {rating}/5."
 
         self.context_manager.add_message(session, "assistant", response_text)
 
@@ -1550,7 +1982,6 @@ What would you like to do?"""
                 "region": bottle.wine.region,
                 "price_usd": bottle.wine.price_usd,
                 "status": bottle.status,
-                "quantity": bottle.quantity,
                 "rating": bottle.rating
             }
         else:
@@ -1565,7 +1996,6 @@ What would you like to do?"""
                 "region": bottle.custom_wine_region,
                 "country": bottle.custom_wine_country,
                 "status": bottle.status,
-                "quantity": bottle.quantity,
                 "rating": bottle.rating
             }
 
