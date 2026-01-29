@@ -7,7 +7,6 @@ import base64
 import json
 import re
 from datetime import timedelta
-from pathlib import Path
 from flask import Flask, jsonify, request, g, Response
 from flask_cors import CORS
 from flask_jwt_extended import (
@@ -46,166 +45,18 @@ from models.schemas import (
     ChatAction,
 )
 
-# Wine recommender path for lazy loading
-_wine_recommender_path = Path(__file__).parent.parent.parent / "wine-recommender"
+# Wine recommender - now using local module
 _recommender_engine = None
 _recommender_prefs_class = None
 
 
-# Fallback classes when wine-recommender module is not available
-class _FallbackUserPreferences:
-    """Fallback UserPreferences class for when wine-recommender is unavailable."""
-    def __init__(self, description: str, budget_min: float = 10.0, budget_max: float = 200.0,
-                 food_pairing: str = None, wine_type_pref: str = None):
-        self.description = description
-        self.budget_min = budget_min
-        self.budget_max = budget_max
-        self.food_pairing = food_pairing
-        self.wine_type_pref = wine_type_pref
-
-
-class _FallbackWineRecommendation:
-    """Fallback WineRecommendation class."""
-    def __init__(self, wine, explanation: str, relevance_score: float):
-        self.wine = wine
-        self.explanation = explanation
-        self.relevance_score = relevance_score
-
-
-class _FallbackWine:
-    """Fallback Wine class for recommendations."""
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-
-def _fallback_get_wine_recommendations(user_prefs, top_n: int = 3, verbose: bool = False):
-    """
-    Fallback wine recommendation function using wine-app's existing utilities.
-    Used when wine-recommender module is not available (e.g., in production deployment).
-    """
-    from utils.embeddings import search_wine_products, search_wset_knowledge, get_openai_client
-
-    # Build search query from user preferences
-    query_parts = [user_prefs.description]
-    if user_prefs.food_pairing:
-        query_parts.append(f"pairs well with {user_prefs.food_pairing}")
-    query_text = " ".join(query_parts)
-
-    # Search wine products
-    matches = search_wine_products(
-        query_text=query_text,
-        price_min=user_prefs.budget_min,
-        price_max=user_prefs.budget_max,
-        wine_type=user_prefs.wine_type_pref,
-        top_k=top_n * 2  # Get extras for better selection
-    )
-
-    if not matches:
-        return []
-
-    # Convert matches to recommendations
-    recommendations = []
-    client = get_openai_client()
-
-    for match in matches[:top_n]:
-        metadata = match['metadata']
-
-        # Parse characteristics and flavor notes
-        characteristics = [c.strip() for c in metadata.get('characteristics', '').split(',')] if metadata.get('characteristics') else []
-        flavor_notes = [f.strip() for f in metadata.get('flavor_notes', '').split(',')] if metadata.get('flavor_notes') else []
-
-        wine = _FallbackWine(
-            id=match['id'],
-            name=metadata.get('name', ''),
-            producer=metadata.get('producer', ''),
-            vintage=metadata.get('vintage') if metadata.get('vintage', 0) > 0 else None,
-            wine_type=metadata.get('wine_type', ''),
-            varietal=metadata.get('varietal', ''),
-            country=metadata.get('country', ''),
-            region=metadata.get('region', ''),
-            body=metadata.get('body', ''),
-            sweetness=metadata.get('sweetness', ''),
-            acidity=metadata.get('acidity', ''),
-            tannin=metadata.get('tannin') if metadata.get('tannin') != "n/a" else None,
-            characteristics=characteristics,
-            flavor_notes=flavor_notes,
-            description=metadata.get('description', ''),
-            price_usd=metadata.get('price_usd', 0),
-            rating=metadata.get('rating') if metadata.get('rating', 0) > 0 else None,
-            vivino_url=metadata.get('vivino_url', '')
-        )
-
-        # Generate simple explanation
-        try:
-            explanation_response = client.chat.completions.create(
-                model=Config.OPENAI_CHAT_MODEL,
-                messages=[{
-                    "role": "user",
-                    "content": f"In 1-2 sentences, explain why this wine matches: '{user_prefs.description}'\n\nWine: {wine.name} - {wine.varietal} from {wine.region}\nCharacteristics: {', '.join(characteristics[:3])}"
-                }],
-                temperature=0.7,
-                max_tokens=100
-            )
-            explanation = explanation_response.choices[0].message.content.strip()
-        except Exception:
-            explanation = f"A {wine.varietal} from {wine.region} that matches your preferences."
-
-        recommendations.append(_FallbackWineRecommendation(
-            wine=wine,
-            explanation=explanation,
-            relevance_score=match['score']
-        ))
-
-    return recommendations
-
-
 def _get_recommender():
-    """Lazy load the wine recommender to avoid module conflicts."""
+    """Get the wine recommender engine and UserPreferences class."""
     global _recommender_engine, _recommender_prefs_class
     if _recommender_engine is None:
-        # Check if wine-recommender path exists
-        if not _wine_recommender_path.exists():
-            # Use fallback implementation
-            print("[wine-app] wine-recommender module not found, using fallback implementation")
-            _recommender_engine = _fallback_get_wine_recommendations
-            _recommender_prefs_class = _FallbackUserPreferences
-            return _recommender_engine, _recommender_prefs_class
-
-        import importlib.util
-
-        # Save current modules that might conflict
-        saved_modules = {}
-        conflicting_prefixes = ['models', 'config', 'agents', 'utils']
-        for mod_name in list(sys.modules.keys()):
-            for prefix in conflicting_prefixes:
-                if mod_name == prefix or mod_name.startswith(prefix + '.'):
-                    saved_modules[mod_name] = sys.modules.pop(mod_name)
-                    break
-
-        # Add wine-recommender to path
-        sys.path.insert(0, str(_wine_recommender_path))
-
-        try:
-            # Load wine-recommender's modules fresh
-            from agents.orchestrator import get_wine_recommendations
-            from models.schemas import UserPreferences
-            _recommender_engine = get_wine_recommendations
-            _recommender_prefs_class = UserPreferences
-        except ImportError as e:
-            # Fallback if import fails
-            print(f"[wine-app] Failed to import wine-recommender: {e}, using fallback")
-            _recommender_engine = _fallback_get_wine_recommendations
-            _recommender_prefs_class = _FallbackUserPreferences
-        finally:
-            # Remove wine-recommender from path
-            if str(_wine_recommender_path) in sys.path:
-                sys.path.remove(str(_wine_recommender_path))
-
-            # Restore wine-app's modules
-            for mod_name, mod in saved_modules.items():
-                sys.modules[mod_name] = mod
-
+        from agents.wine_recommender import get_wine_recommendations, UserPreferences
+        _recommender_engine = get_wine_recommendations
+        _recommender_prefs_class = UserPreferences
     return _recommender_engine, _recommender_prefs_class
 
 
