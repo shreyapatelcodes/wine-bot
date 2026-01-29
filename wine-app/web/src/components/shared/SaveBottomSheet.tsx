@@ -30,13 +30,6 @@ const statusOptions: StatusOption[] = [
     icon: <CheckCircle className="w-5 h-5" />,
     color: 'text-blue-600 bg-blue-50 border-blue-200',
   },
-  {
-    value: 'want_to_try',
-    label: 'Want to Try',
-    description: 'Add to my list to try later',
-    icon: <Wine className="w-5 h-5" />,
-    color: 'text-purple-600 bg-purple-50 border-purple-200',
-  },
 ];
 
 interface SaveBottomSheetProps {
