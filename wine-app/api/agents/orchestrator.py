@@ -1911,7 +1911,7 @@ What would you like to do?"""
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
-            print(f"Response generation error: {e}")
+            print(f"Response generation error: {e}", flush=True)
             return "I'm having trouble responding right now. Please try again."
 
     def _parse_json(self, text: str) -> Dict[str, Any]:
