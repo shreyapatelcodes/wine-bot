@@ -19,7 +19,9 @@ from models.database import Base
 config = context.config
 
 # Set database URL from our config
-config.set_main_option("sqlalchemy.url", Config.DATABASE_URL)
+# Don't use set_main_option as it fails with special characters in passwords
+if Config.DATABASE_URL:
+    config.set_main_option("sqlalchemy.url", Config.DATABASE_URL.replace('%', '%%'))
 
 # Interpret config file for Python logging
 if config.config_file_name is not None:
