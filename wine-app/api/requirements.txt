@@ -18,7 +18,7 @@ email-validator>=2.0.0
 
 # AI/ML
 openai>=1.0.0
-pinecone-client>=3.0.0
+pinecone>=3.0.0
 
 # Utilities
 python-dotenv>=1.0.0
