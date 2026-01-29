@@ -86,3 +86,71 @@ body {
 .safe-area-pb {
   padding-bottom: env(safe-area-inset-bottom);
 }
+
+/* Save animation - scale up with checkmark */
+@keyframes save-pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-save-pop {
+  animation: save-pop 0.3s ease-out;
+}
+
+/* Card save animation - subtle scale + glow */
+@keyframes card-saved {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(225, 74, 114, 0);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 4px rgba(225, 74, 114, 0.2);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(225, 74, 114, 0);
+  }
+}
+
+.animate-card-saved {
+  animation: card-saved 0.4s ease-out;
+}
+
+/* Success checkmark animation */
+@keyframes checkmark-draw {
+  0% {
+    stroke-dashoffset: 20;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-checkmark {
+  stroke-dasharray: 20;
+  animation: checkmark-draw 0.3s ease-out forwards;
+}
+
+/* Fade out animation for removed items */
+@keyframes fade-out-scale {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+.animate-fade-out {
+  animation: fade-out-scale 0.2s ease-out forwards;
+}

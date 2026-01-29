@@ -1,8 +1,9 @@
 /**
- * Card component for saved bottles
+ * Card component for wishlist bottles
  */
 
-import { Trash2, ArrowRightCircle, Wine, MapPin, DollarSign, Calendar } from 'lucide-react';
+import { useState } from 'react';
+import { Trash2, Package, Wine, MapPin, DollarSign, Heart, Check } from 'lucide-react';
 import type { SavedBottle } from '../../types';
 
 interface SavedBottleCardProps {
@@ -21,6 +22,19 @@ export function SavedBottleCard({
   isMoving,
 }: SavedBottleCardProps) {
   const { wine } = bottle;
+  const [isMovingAnim, setIsMovingAnim] = useState(false);
+  const [isRemovingAnim, setIsRemovingAnim] = useState(false);
+
+  const handleMoveToCellar = () => {
+    setIsMovingAnim(true);
+    onMoveToCellar(bottle.id);
+  };
+
+  const handleRemove = () => {
+    setIsRemovingAnim(true);
+    // Small delay to show animation before removal
+    setTimeout(() => onRemove(bottle.id), 200);
+  };
 
   const getWineTypeColor = (type: string) => {
     switch (type) {
@@ -38,11 +52,12 @@ export function SavedBottleCard({
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+    <div className={`bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-all ${isRemovingAnim ? 'animate-fade-out' : ''} ${isMovingAnim ? 'animate-card-saved' : ''}`}>
       <div className="flex items-start gap-4">
-        {/* Wine icon */}
-        <div className={`p-3 rounded-lg ${getWineTypeColor(wine.wine_type)}`}>
+        {/* Wine icon with wishlist indicator */}
+        <div className={`p-3 rounded-lg ${getWineTypeColor(wine.wine_type)} relative`}>
           <Wine className="w-6 h-6" />
+          <Heart className="w-3 h-3 absolute -top-1 -right-1 text-pink-500 fill-current" />
         </div>
 
         {/* Wine details */}
@@ -95,28 +110,32 @@ export function SavedBottleCard({
             <p className="text-sm text-gray-600 mt-2">{bottle.notes}</p>
           )}
 
-          {/* Saved date */}
+          {/* Added to wishlist date */}
           <p className="flex items-center gap-1 text-xs text-gray-400 mt-2">
-            <Calendar className="w-3 h-3" />
-            Saved {new Date(bottle.saved_at).toLocaleDateString()}
+            <Heart className="w-3 h-3" />
+            Added {new Date(bottle.saved_at).toLocaleDateString()}
           </p>
         </div>
 
         {/* Actions */}
         <div className="flex flex-col gap-2">
           <button
-            onClick={() => onMoveToCellar(bottle.id)}
-            disabled={isMoving}
-            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
-            title="Move to Cellar"
+            onClick={handleMoveToCellar}
+            disabled={isMoving || isMovingAnim}
+            className={`p-2 text-green-600 hover:bg-green-50 rounded-lg transition-all disabled:opacity-50 ${isMovingAnim ? 'animate-save-pop bg-green-50' : ''}`}
+            title="Add to Cellar"
           >
-            <ArrowRightCircle className="w-5 h-5" />
+            {isMovingAnim ? (
+              <Check className="w-5 h-5" />
+            ) : (
+              <Package className="w-5 h-5" />
+            )}
           </button>
           <button
-            onClick={() => onRemove(bottle.id)}
-            disabled={isRemoving}
-            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-            title="Remove"
+            onClick={handleRemove}
+            disabled={isRemoving || isRemovingAnim}
+            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+            title="Remove from Wishlist"
           >
             <Trash2 className="w-5 h-5" />
           </button>
