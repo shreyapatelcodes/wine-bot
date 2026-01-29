@@ -17,9 +17,13 @@ interface ListSectionProps {
   items: Array<{ id: string; name: string; producer?: string | null }>;
   isExpanded: boolean;
   onToggle: () => void;
+  emptyAction?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
-function ListSection({ title, icon, count, color, items, isExpanded, onToggle }: ListSectionProps) {
+function ListSection({ title, icon, count, color, items, isExpanded, onToggle, emptyAction }: ListSectionProps) {
   return (
     <div className="mb-2">
       <button
@@ -57,7 +61,19 @@ function ListSection({ title, icon, count, color, items, isExpanded, onToggle }:
         </div>
       )}
 
-      {isExpanded && items.length === 0 && (
+      {isExpanded && items.length === 0 && emptyAction && (
+        <div className="ml-6 mt-1">
+          <button
+            onClick={emptyAction.onClick}
+            className={`px-3 py-2 text-xs ${color} hover:bg-cream-dark/50 rounded transition-colors flex items-center gap-1`}
+          >
+            <span>{emptyAction.label}</span>
+            <span className="text-gray-400">→</span>
+          </button>
+        </div>
+      )}
+
+      {isExpanded && items.length === 0 && !emptyAction && (
         <div className="ml-6 mt-1 px-3 py-2 text-xs text-gray-400 italic">
           No wines yet
         </div>
@@ -79,6 +95,15 @@ export function WineListsSidebar() {
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  // Focus the chat input when empty action is clicked
+  const focusChatInput = () => {
+    const chatInput = document.querySelector('textarea');
+    if (chatInput) {
+      chatInput.focus();
+      chatInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   };
 
   // Transform data for display
@@ -146,6 +171,10 @@ export function WineListsSidebar() {
             items={wishlistItems}
             isExpanded={expandedSections.wishlist}
             onToggle={() => toggleSection('wishlist')}
+            emptyAction={{
+              label: "Find your first bottle",
+              onClick: focusChatInput,
+            }}
           />
 
           <ListSection
@@ -156,6 +185,10 @@ export function WineListsSidebar() {
             items={cellarItems}
             isExpanded={expandedSections.cellar}
             onToggle={() => toggleSection('cellar')}
+            emptyAction={{
+              label: "Add wines you own",
+              onClick: focusChatInput,
+            }}
           />
 
           <ListSection
@@ -166,6 +199,10 @@ export function WineListsSidebar() {
             items={triedItems}
             isExpanded={expandedSections.tried}
             onToggle={() => toggleSection('tried')}
+            emptyAction={{
+              label: "Rate a wine you've had",
+              onClick: focusChatInput,
+            }}
           />
         </nav>
       )}

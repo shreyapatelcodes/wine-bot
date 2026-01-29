@@ -12,9 +12,10 @@ interface ChatMessageProps {
   message: ChatMessageType;
   onSaveWine?: (wine: Wine) => void;
   onAction?: (action: ChatAction, cardContext?: ChatCard) => void;
+  onExampleQuery?: (query: string) => void;
 }
 
-export function ChatMessage({ message, onSaveWine, onAction }: ChatMessageProps) {
+export function ChatMessage({ message, onSaveWine, onAction, onExampleQuery }: ChatMessageProps) {
   const isUser = message.role === 'user';
 
   // Render cards based on type
@@ -195,6 +196,24 @@ export function ChatMessage({ message, onSaveWine, onAction }: ChatMessageProps)
               actions={message.actions}
               onAction={onAction}
             />
+          </div>
+        )}
+
+        {/* Example queries for cold start */}
+        {!isUser && message.exampleQueries && message.exampleQueries.length > 0 && onExampleQuery && (
+          <div className="mt-4 space-y-2">
+            <span className="text-xs text-gray-400 font-mono uppercase tracking-wider">Try asking:</span>
+            <div className="flex flex-col gap-1.5">
+              {message.exampleQueries.map((query, index) => (
+                <button
+                  key={index}
+                  onClick={() => onExampleQuery(query)}
+                  className="text-left text-sm text-wine-600 hover:text-wine-700 hover:bg-wine-50 px-3 py-2 rounded-lg transition-colors border border-wine-200/50 hover:border-wine-300"
+                >
+                  "{query}"
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>

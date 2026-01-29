@@ -80,6 +80,14 @@ export function ChatContainer() {
     [sendMessage]
   );
 
+  // Handle example query clicks
+  const handleExampleQuery = useCallback(
+    async (query: string) => {
+      await sendMessage(query);
+    },
+    [sendMessage]
+  );
+
   return (
     <>
       <div className="flex flex-col h-full">
@@ -91,6 +99,7 @@ export function ChatContainer() {
               message={message}
               onSaveWine={handleSaveWineClick}
               onAction={handleActionClick}
+              onExampleQuery={handleExampleQuery}
             />
           ))}
           {isLoading && <TypingIndicator showSkeletonCards={expectsCards} />}

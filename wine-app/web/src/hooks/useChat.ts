@@ -52,6 +52,13 @@ function createWelcomeMessage(isAuthenticated: boolean): ChatMessage {
     { type: 'cellar', label: 'My cellar' },
   ];
 
+  // Example queries to help users get started
+  const exampleQueries = [
+    "cheap red for taco night",
+    "birthday gift under $50",
+    "what's the deal with natural wine?",
+  ];
+
   return {
     id: 'welcome',
     role: 'assistant',
@@ -60,6 +67,7 @@ function createWelcomeMessage(isAuthenticated: boolean): ChatMessage {
       : "Hey! I'm Pip. Looking for something to drink, or just curious about wine?",
     timestamp: new Date().toISOString(),
     actions: isAuthenticated ? [...baseActions, ...authActions] : baseActions,
+    exampleQueries,
   };
 }
 
