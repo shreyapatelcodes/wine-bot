@@ -62,7 +62,8 @@ class ApiClient {
   private async request<T>(
     endpoint: string,
     options: RequestInit = {},
-    requiresAuth: boolean = true
+    requiresAuth: boolean = true,
+    timeoutMs: number = 30000
   ): Promise<T> {
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
@@ -76,42 +77,57 @@ class ApiClient {
       }
     }
 
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
-      headers,
-    });
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    // Handle 401 - try to refresh token
-    if (response.status === 401 && requiresAuth) {
-      const refreshed = await this.refreshAccessToken();
-      if (refreshed) {
-        // Retry the request with new token
-        const newToken = getAccessToken();
-        if (newToken) {
-          (headers as Record<string, string>)['Authorization'] = `Bearer ${newToken}`;
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // Handle 401 - try to refresh token
+      if (response.status === 401 && requiresAuth) {
+        const refreshed = await this.refreshAccessToken();
+        if (refreshed) {
+          // Retry the request with new token
+          const newToken = getAccessToken();
+          if (newToken) {
+            (headers as Record<string, string>)['Authorization'] = `Bearer ${newToken}`;
+          }
+          const retryResponse = await fetch(`${this.baseUrl}${endpoint}`, {
+            ...options,
+            headers,
+          });
+          if (!retryResponse.ok) {
+            const error: ApiError = await retryResponse.json().catch(() => ({ error: 'Request failed' }));
+            throw new Error(error.error || `HTTP ${retryResponse.status}`);
+          }
+          return retryResponse.json();
+        } else {
+          // Refresh failed, clear tokens
+          clearTokens();
+          throw new Error('Session expired. Please log in again.');
         }
-        const retryResponse = await fetch(`${this.baseUrl}${endpoint}`, {
-          ...options,
-          headers,
-        });
-        if (!retryResponse.ok) {
-          const error: ApiError = await retryResponse.json().catch(() => ({ error: 'Request failed' }));
-          throw new Error(error.error || `HTTP ${retryResponse.status}`);
-        }
-        return retryResponse.json();
-      } else {
-        // Refresh failed, clear tokens
-        clearTokens();
-        throw new Error('Session expired. Please log in again.');
       }
-    }
 
-    if (!response.ok) {
-      const error: ApiError = await response.json().catch(() => ({ error: 'Request failed' }));
-      throw new Error(error.error || `HTTP ${response.status}`);
-    }
+      if (!response.ok) {
+        const error: ApiError = await response.json().catch(() => ({ error: 'Request failed' }));
+        throw new Error(error.error || `HTTP ${response.status}`);
+      }
 
-    return response.json();
+      return response.json();
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('Request timed out. The server is taking too long to respond.');
+      }
+      throw error;
+    }
   }
 
   private async refreshAccessToken(): Promise<boolean> {
@@ -285,7 +301,8 @@ class ApiClient {
         method: 'POST',
         body: JSON.stringify(request),
       },
-      hasAuth
+      hasAuth,
+      60000  // 60 second timeout for chat (OpenAI can be slow)
     );
   }
 
