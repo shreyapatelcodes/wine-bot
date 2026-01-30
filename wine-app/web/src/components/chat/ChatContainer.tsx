@@ -7,12 +7,13 @@ import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { TypingIndicator } from './TypingIndicator';
 import { SavedToast } from '../shared';
-import { useChat, useSavedBottles } from '../../hooks';
+import { useSavedBottles } from '../../hooks';
 import { useAuth } from '../../context/AuthContext';
+import { useChatContext } from '../../context/ChatContext';
 import type { Wine, ChatAction, ChatCard } from '../../types';
 
 export function ChatContainer() {
-  const { messages, isLoading, expectsCards, sendMessage, handleAction } = useChat();
+  const { messages, isLoading, expectsCards, sendMessage, handleAction } = useChatContext();
   const { saveBottle } = useSavedBottles();
   const { isAuthenticated } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);

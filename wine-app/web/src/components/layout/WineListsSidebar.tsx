@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import { Heart, Package, Star, ChevronDown, ChevronRight, Wine as WineIcon, Lock } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useChatContext } from '../../context/ChatContext';
 import { useSavedBottles } from '../../hooks/useSavedBottles';
 import { useCellar } from '../../hooks/useCellar';
 import type { SavedBottle, CellarBottle } from '../../types';
@@ -84,6 +85,7 @@ function ListSection({ title, icon, count, color, items, isExpanded, onToggle, e
 
 export function WineListsSidebar() {
   const { isAuthenticated } = useAuth();
+  const { sendMessage } = useChatContext();
   const { bottles: savedBottles, isLoading: savedLoading } = useSavedBottles();
   const { bottles: cellarBottles, isLoading: cellarLoading } = useCellar();
 
@@ -95,15 +97,6 @@ export function WineListsSidebar() {
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
-  };
-
-  // Focus the chat input when empty action is clicked
-  const focusChatInput = () => {
-    const chatInput = document.querySelector('textarea');
-    if (chatInput) {
-      chatInput.focus();
-      chatInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
   };
 
   // Transform data for display
@@ -173,7 +166,7 @@ export function WineListsSidebar() {
             onToggle={() => toggleSection('wishlist')}
             emptyAction={{
               label: "Find your first bottle",
-              onClick: focusChatInput,
+              onClick: () => sendMessage("Help me find a wine"),
             }}
           />
 
@@ -187,7 +180,7 @@ export function WineListsSidebar() {
             onToggle={() => toggleSection('cellar')}
             emptyAction={{
               label: "Add wines you own",
-              onClick: focusChatInput,
+              onClick: () => sendMessage("I want to add a wine to my cellar"),
             }}
           />
 
@@ -201,7 +194,7 @@ export function WineListsSidebar() {
             onToggle={() => toggleSection('tried')}
             emptyAction={{
               label: "Rate a wine you've had",
-              onClick: focusChatInput,
+              onClick: () => sendMessage("I want to rate a wine I've tried"),
             }}
           />
         </nav>

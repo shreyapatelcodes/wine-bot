@@ -4,9 +4,11 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import type { SavedBottle, SavedBottleCreate } from '../types';
 
 export function useSavedBottles() {
+  const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -15,6 +17,7 @@ export function useSavedBottles() {
       const response = await api.getSavedBottles();
       return response.bottles;
     },
+    enabled: isAuthenticated,
   });
 
   const saveMutation = useMutation({

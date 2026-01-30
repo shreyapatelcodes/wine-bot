@@ -4,9 +4,11 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import type { CellarBottleCreate, CellarBottleUpdate, CellarBottle } from '../types';
 
 export function useCellar(status?: 'owned' | 'tried') {
+  const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -15,6 +17,7 @@ export function useCellar(status?: 'owned' | 'tried') {
       const response = await api.getCellar(status);
       return response.bottles;
     },
+    enabled: isAuthenticated,
   });
 
   const addMutation = useMutation({
