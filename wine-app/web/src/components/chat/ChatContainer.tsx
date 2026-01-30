@@ -3,6 +3,7 @@
  */
 
 import { useRef, useEffect, useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { TypingIndicator } from './TypingIndicator';
@@ -16,6 +17,7 @@ export function ChatContainer() {
   const { messages, isLoading, expectsCards, sendMessage, handleAction } = useChatContext();
   const { saveBottle } = useSavedBottles();
   const { isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showSavedToast, setShowSavedToast] = useState(false);
@@ -25,6 +27,24 @@ export function ChatContainer() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Invalidate cellar/saved queries when messages change (to catch backend updates)
+  useEffect(() => {
+    if (messages.length > 0 && isAuthenticated) {
+      const lastMessage = messages[messages.length - 1];
+
+      // If last message is from assistant with cellar-related intent, refetch
+      if (lastMessage.role === 'assistant' && lastMessage.intent) {
+        const cellarIntents = ['cellar_add', 'cellar_remove', 'rate', 'cellar_query'];
+
+        if (cellarIntents.includes(lastMessage.intent)) {
+          // Invalidate both cellar and saved bottles to ensure sidebar updates
+          queryClient.invalidateQueries({ queryKey: ['cellar'] });
+          queryClient.invalidateQueries({ queryKey: ['savedBottles'] });
+        }
+      }
+    }
+  }, [messages, isAuthenticated, queryClient]);
 
   const handleSaveWineClick = useCallback(
     async (wine: Wine) => {

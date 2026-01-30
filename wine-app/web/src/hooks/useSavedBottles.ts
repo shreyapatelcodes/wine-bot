@@ -18,6 +18,8 @@ export function useSavedBottles() {
       return response.bottles;
     },
     enabled: isAuthenticated,
+    refetchOnWindowFocus: true,
+    staleTime: 1000, // Consider data stale after 1 second
   });
 
   const saveMutation = useMutation({
