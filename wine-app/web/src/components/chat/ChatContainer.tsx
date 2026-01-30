@@ -84,6 +84,11 @@ export function ChatContainer() {
   // Handle example query clicks
   const handleExampleQuery = useCallback(
     async (query: string) => {
+      // Special handling for image upload query
+      if (query.toLowerCase().includes('scan')) {
+        fileInputRef.current?.click();
+        return;
+      }
       await sendMessage(query);
     },
     [sendMessage]

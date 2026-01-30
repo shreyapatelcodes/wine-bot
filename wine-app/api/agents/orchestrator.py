@@ -459,17 +459,28 @@ Current user message: {message}
             # Clear stored prefs after using them
             self.context_manager.update_session_context(session, {"recommendation_prefs": None})
 
-        # Only ask clarifying questions for VERY generic requests (< 4 words with no useful info)
+        # Ask conversational follow-ups when we don't have enough info
         is_vague = not has_price and not has_food and not has_type and not has_characteristics and not has_occasion
         message_lower = message.lower()
-        is_very_generic = any(phrase in message_lower for phrase in [
-            "find a wine", "find me a wine", "recommend something", "help me find",
-            "suggest a wine", "wine recommendation"
-        ]) and len(message.split()) < 5
 
-        if is_vague and is_very_generic:
-            # More casual approach - just ask one natural question
-            response_text = "Sure! What are you in the mood for? Tell me anything - price range, what you're eating, red or white, whatever."
+        if is_vague:
+            # Generate a natural, contextual follow-up question using GPT
+            prompt = f"""The user wants wine recommendations but hasn't given much detail.
+
+User's message: "{message}"
+
+Generate ONE natural follow-up question to get more context. Be casual and conversational.
+Ask about whatever seems most useful (occasion, food pairing, budget, preference, etc.).
+
+Examples:
+- "What's the occasion? Just a Tuesday dinner or something special?"
+- "What are you pairing it with?"
+- "Red, white, or keeping your options open?"
+- "What's your budget looking like?"
+
+Generate a single natural question (no more than 15 words):"""
+
+            response_text = self._generate_response(prompt)
             self.context_manager.add_message(session, "assistant", response_text)
 
             return self._build_response(
@@ -656,13 +667,6 @@ Current user message: {message}
                 "producer": wine.producer
             })
 
-        # Build actions
-        actions = [
-            {"type": "save", "label": "Save"},
-            {"type": "add_cellar", "label": "Add to cellar"},
-            {"type": "tell_more", "label": "Tell me more"}
-        ]
-
         # Store recommendations in message metadata
         self.context_manager.add_message(
             session, "assistant", response_text,
@@ -673,8 +677,7 @@ Current user message: {message}
             session=session,
             response=response_text,
             intent="recommend",
-            cards=cards,
-            actions=actions
+            cards=cards
         )
 
     def _handle_education_general(
