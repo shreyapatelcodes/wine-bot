@@ -320,8 +320,42 @@ def create_app():
 
         # Check if wine exists
         wine = db.query(Wine).filter(Wine.id == data.wine_id).first()
+
+        # If wine doesn't exist in DB, fetch from Pinecone and create it
         if not wine:
-            return jsonify({"error": "Wine not found"}), 404
+            from utils.embeddings import get_pinecone_index
+            from config import Config
+
+            try:
+                index = get_pinecone_index(Config.PINECONE_PRODUCTS_INDEX)
+                pinecone_result = index.fetch(ids=[data.wine_id])
+
+                if data.wine_id not in pinecone_result.get('vectors', {}):
+                    return jsonify({"error": "Wine not found"}), 404
+
+                wine_data = pinecone_result['vectors'][data.wine_id]['metadata']
+
+                # Create wine in database from Pinecone metadata
+                wine = Wine(
+                    id=data.wine_id,
+                    name=wine_data.get('name', ''),
+                    producer=wine_data.get('producer'),
+                    vintage=wine_data.get('vintage') if wine_data.get('vintage', 0) > 0 else None,
+                    wine_type=wine_data.get('wine_type', ''),
+                    varietal=wine_data.get('varietal'),
+                    country=wine_data.get('country'),
+                    region=wine_data.get('region'),
+                    price_usd=wine_data.get('price_usd'),
+                    wine_metadata={
+                        k: v for k, v in wine_data.items()
+                        if k not in ['name', 'producer', 'vintage', 'wine_type', 'varietal', 'country', 'region', 'price_usd']
+                    }
+                )
+                db.add(wine)
+                db.commit()
+            except Exception as e:
+                print(f"Error fetching wine from Pinecone: {e}")
+                return jsonify({"error": "Wine not found"}), 404
 
         # Check if already saved
         existing = db.query(SavedBottle).filter(
@@ -490,11 +524,45 @@ def create_app():
         if not data.wine_id and not data.custom_wine_name:
             return jsonify({"error": "Either wine_id or custom_wine_name required"}), 400
 
-        # If wine_id provided, verify it exists
+        # If wine_id provided, verify it exists (create from Pinecone if needed)
         if data.wine_id:
             wine = db.query(Wine).filter(Wine.id == data.wine_id).first()
+
+            # If wine doesn't exist in DB, fetch from Pinecone and create it
             if not wine:
-                return jsonify({"error": "Wine not found"}), 404
+                from utils.embeddings import get_pinecone_index
+                from config import Config
+
+                try:
+                    index = get_pinecone_index(Config.PINECONE_PRODUCTS_INDEX)
+                    pinecone_result = index.fetch(ids=[data.wine_id])
+
+                    if data.wine_id not in pinecone_result.get('vectors', {}):
+                        return jsonify({"error": "Wine not found"}), 404
+
+                    wine_data = pinecone_result['vectors'][data.wine_id]['metadata']
+
+                    # Create wine in database from Pinecone metadata
+                    wine = Wine(
+                        id=data.wine_id,
+                        name=wine_data.get('name', ''),
+                        producer=wine_data.get('producer'),
+                        vintage=wine_data.get('vintage') if wine_data.get('vintage', 0) > 0 else None,
+                        wine_type=wine_data.get('wine_type', ''),
+                        varietal=wine_data.get('varietal'),
+                        country=wine_data.get('country'),
+                        region=wine_data.get('region'),
+                        price_usd=wine_data.get('price_usd'),
+                        wine_metadata={
+                            k: v for k, v in wine_data.items()
+                            if k not in ['name', 'producer', 'vintage', 'wine_type', 'varietal', 'country', 'region', 'price_usd']
+                        }
+                    )
+                    db.add(wine)
+                    db.commit()
+                except Exception as e:
+                    print(f"Error fetching wine from Pinecone: {e}")
+                    return jsonify({"error": "Wine not found"}), 404
 
         # Create cellar bottle
         cellar = CellarBottle(
