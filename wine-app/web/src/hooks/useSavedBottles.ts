@@ -19,7 +19,8 @@ export function useSavedBottles() {
     },
     enabled: isAuthenticated,
     refetchOnWindowFocus: true,
-    staleTime: 1000, // Consider data stale after 1 second
+    refetchInterval: 3000, // Poll every 3 seconds
+    staleTime: 0, // Always consider stale to refetch immediately
   });
 
   const saveMutation = useMutation({
