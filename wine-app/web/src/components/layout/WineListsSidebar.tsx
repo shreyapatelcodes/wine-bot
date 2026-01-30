@@ -10,6 +10,7 @@ import { useSavedBottles } from '../../hooks/useSavedBottles';
 import { useCellar } from '../../hooks/useCellar';
 import type { SavedBottle, CellarBottle } from '../../types';
 
+
 interface ListSectionProps {
   title: string;
   icon: React.ReactNode;
@@ -18,13 +19,14 @@ interface ListSectionProps {
   items: Array<{ id: string; name: string; producer?: string | null }>;
   isExpanded: boolean;
   onToggle: () => void;
+  onItemClick?: (item: { id: string; name: string; producer?: string | null }) => void;
   emptyAction?: {
     label: string;
     onClick: () => void;
   };
 }
 
-function ListSection({ title, icon, count, color, items, isExpanded, onToggle, emptyAction }: ListSectionProps) {
+function ListSection({ title, icon, count, color, items, isExpanded, onToggle, onItemClick, emptyAction }: ListSectionProps) {
   return (
     <div className="mb-2">
       <button
@@ -46,13 +48,14 @@ function ListSection({ title, icon, count, color, items, isExpanded, onToggle, e
       {isExpanded && items.length > 0 && (
         <div className="ml-6 mt-1 space-y-0.5">
           {items.slice(0, 5).map((item) => (
-            <div
+            <button
               key={item.id}
-              className="px-3 py-1.5 text-sm text-gray-600 truncate hover:bg-cream-dark/30 rounded transition-colors cursor-default"
+              onClick={() => onItemClick?.(item)}
+              className="w-full px-3 py-1.5 text-sm text-gray-600 truncate hover:bg-cream-dark/30 rounded transition-colors cursor-pointer text-left"
               title={`${item.name}${item.producer ? ` - ${item.producer}` : ''}`}
             >
               {item.name}
-            </div>
+            </button>
           ))}
           {items.length > 5 && (
             <div className="px-3 py-1 text-xs text-gray-400 italic">
@@ -97,6 +100,11 @@ export function WineListsSidebar() {
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  // Handle clicking a wine in the sidebar to show its details
+  const handleWineClick = (item: { id: string; name: string; producer?: string | null }) => {
+    sendMessage(`Show me details for ${item.name}`);
   };
 
   // Transform data for display
@@ -164,6 +172,7 @@ export function WineListsSidebar() {
             items={wishlistItems}
             isExpanded={expandedSections.wishlist}
             onToggle={() => toggleSection('wishlist')}
+            onItemClick={handleWineClick}
             emptyAction={{
               label: "Find your first bottle",
               onClick: () => sendMessage("Help me find a wine"),
@@ -178,6 +187,7 @@ export function WineListsSidebar() {
             items={cellarItems}
             isExpanded={expandedSections.cellar}
             onToggle={() => toggleSection('cellar')}
+            onItemClick={handleWineClick}
             emptyAction={{
               label: "Add wines you own",
               onClick: () => sendMessage("I want to add a wine to my cellar"),
@@ -192,6 +202,7 @@ export function WineListsSidebar() {
             items={triedItems}
             isExpanded={expandedSections.tried}
             onToggle={() => toggleSection('tried')}
+            onItemClick={handleWineClick}
             emptyAction={{
               label: "Rate a wine you've had",
               onClick: () => sendMessage("I want to rate a wine I've tried"),
