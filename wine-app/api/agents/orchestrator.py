@@ -1074,6 +1074,15 @@ Provide helpful information about this wine. Be conversational and informative."
 
             if existing:
                 existing.quantity += 1
+
+                # Remove from wishlist if it was saved
+                saved_bottle = self.db.query(SavedBottle).filter(
+                    SavedBottle.user_id == self.user.id,
+                    SavedBottle.wine_id == wine_id
+                ).first()
+                if saved_bottle:
+                    self.db.delete(saved_bottle)
+
                 self.db.commit()
                 response_text = f"Added another bottle of {wine_ref.get('wine_name')} to your cellar. You now have {existing.quantity}."
             else:
@@ -1087,6 +1096,15 @@ Provide helpful information about this wine. Be conversational and informative."
                 self.db.add(cellar_bottle)
                 self.db.commit()
                 self.db.refresh(cellar_bottle)
+
+                # Remove from wishlist if it was saved
+                saved_bottle = self.db.query(SavedBottle).filter(
+                    SavedBottle.user_id == self.user.id,
+                    SavedBottle.wine_id == wine_id
+                ).first()
+                if saved_bottle:
+                    self.db.delete(saved_bottle)
+                    self.db.commit()
 
                 # Track for undo
                 self.context_manager.track_action(session, "cellar_add", {
