@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Heart, HeartOff, Wine as WineIcon, Camera, Star, Package, Check } from 'lucide-react';
+import { Heart, Wine as WineIcon, Camera, Star, Package, Check } from 'lucide-react';
 import type { WineRecommendation, Wine } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 
