@@ -837,6 +837,47 @@ Provide helpful information about this wine. Be conversational and informative."
         message_lower = message.lower()
         is_saved_query = any(phrase in message_lower for phrase in ['saved', 'want to try', 'to try', 'wines to try', 'try list'])
 
+        # Check if user clicked a specific wine from sidebar
+        # Format: "Show my saved wine: [name]", "Show my cellar wine: [name]", "Show my tried wine: [name]"
+        if 'show my saved wine:' in message_lower:
+            wine_name = message.split(':', 1)[1].strip()
+            saved_bottle = self.db.query(SavedBottle).join(Wine).filter(
+                SavedBottle.user_id == self.user.id,
+                Wine.name.ilike(f'%{wine_name}%')
+            ).first()
+
+            if saved_bottle:
+                card = self._saved_bottle_to_card(saved_bottle)
+                response_text = f"Here's {saved_bottle.wine.name} from your wishlist:"
+                self.context_manager.add_message(session, "assistant", response_text)
+                return self._build_response(
+                    session=session,
+                    response=response_text,
+                    intent="cellar_query",
+                    cards=[card]
+                )
+
+        elif 'show my cellar wine:' in message_lower or 'show my tried wine:' in message_lower:
+            wine_name = message.split(':', 1)[1].strip()
+            is_tried = 'tried wine:' in message_lower
+
+            cellar_bottle = self.db.query(CellarBottle).join(Wine, CellarBottle.wine_id == Wine.id, isouter=True).filter(
+                CellarBottle.user_id == self.user.id,
+                CellarBottle.status == ('tried' if is_tried else 'owned'),
+                ((Wine.name.ilike(f'%{wine_name}%')) | (CellarBottle.custom_wine_name.ilike(f'%{wine_name}%')))
+            ).first()
+
+            if cellar_bottle:
+                card = self._cellar_bottle_to_card(cellar_bottle)
+                response_text = f"Here's {cellar_bottle.wine.name if cellar_bottle.wine else cellar_bottle.custom_wine_name}:"
+                self.context_manager.add_message(session, "assistant", response_text)
+                return self._build_response(
+                    session=session,
+                    response=response_text,
+                    intent="cellar_query",
+                    cards=[card]
+                )
+
         # Get status from entities or infer from message
         status = entities.get("status")
         if status is None and is_saved_query:

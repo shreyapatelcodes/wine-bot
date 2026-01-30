@@ -11,15 +11,23 @@ import { useCellar } from '../../hooks/useCellar';
 import type { SavedBottle, CellarBottle } from '../../types';
 
 
+type WineListItem = {
+  id: string;
+  name: string;
+  producer?: string | null;
+  wine_id?: string;
+  list_type?: 'saved' | 'cellar' | 'tried';
+};
+
 interface ListSectionProps {
   title: string;
   icon: React.ReactNode;
   count: number;
   color: string;
-  items: Array<{ id: string; name: string; producer?: string | null }>;
+  items: Array<WineListItem>;
   isExpanded: boolean;
   onToggle: () => void;
-  onItemClick?: (item: { id: string; name: string; producer?: string | null }) => void;
+  onItemClick?: (item: WineListItem) => void;
   emptyAction?: {
     label: string;
     onClick: () => void;
@@ -103,8 +111,11 @@ export function WineListsSidebar() {
   };
 
   // Handle clicking a wine in the sidebar to show its details
-  const handleWineClick = (item: { id: string; name: string; producer?: string | null }) => {
-    sendMessage(`Show me details for ${item.name}`);
+  const handleWineClick = (item: WineListItem) => {
+    // Send a structured message that the backend can parse
+    // Format: "Show details: bottle_id=[id] type=[saved|cellar|tried]"
+    const message = `Show my ${item.list_type === 'saved' ? 'saved wine' : item.list_type === 'tried' ? 'tried wine' : 'cellar wine'}: ${item.name}`;
+    sendMessage(message);
   };
 
   // Transform data for display
@@ -112,6 +123,8 @@ export function WineListsSidebar() {
     id: b.id,
     name: b.wine.name,
     producer: b.wine.producer,
+    wine_id: b.wine.id,
+    list_type: 'saved' as const,
   }));
 
   const cellarItems = cellarBottles
@@ -120,6 +133,8 @@ export function WineListsSidebar() {
       id: b.id,
       name: b.wine?.name || b.custom_wine_name || 'Unknown',
       producer: b.wine?.producer || b.custom_wine_producer,
+      wine_id: b.wine?.id,
+      list_type: 'cellar' as const,
     }));
 
   const triedItems = cellarBottles
@@ -128,6 +143,8 @@ export function WineListsSidebar() {
       id: b.id,
       name: b.wine?.name || b.custom_wine_name || 'Unknown',
       producer: b.wine?.producer || b.custom_wine_producer,
+      wine_id: b.wine?.id,
+      list_type: 'tried' as const,
     }));
 
   const isLoading = savedLoading || cellarLoading;
