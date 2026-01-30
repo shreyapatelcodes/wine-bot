@@ -868,7 +868,7 @@ Provide helpful information about this wine. Be conversational and informative."
             ).first()
 
             if cellar_bottle:
-                card = self._cellar_bottle_to_card(cellar_bottle)
+                card = self._bottle_to_card(cellar_bottle)
                 response_text = f"Here's {cellar_bottle.wine.name if cellar_bottle.wine else cellar_bottle.custom_wine_name}:"
                 self.context_manager.add_message(session, "assistant", response_text)
                 return self._build_response(
