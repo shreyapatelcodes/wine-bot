@@ -2,7 +2,8 @@
  * Chat context for sharing chat state and actions across components
  */
 
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext } from 'react';
+import type { ReactNode } from 'react';
 import { useChat } from '../hooks';
 import type { ChatMessage, ChatAction, ChatCard } from '../types';
 
