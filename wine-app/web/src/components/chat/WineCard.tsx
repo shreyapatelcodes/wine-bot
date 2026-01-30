@@ -2,7 +2,8 @@
  * Wine recommendation card component
  */
 
-import { Bookmark, BookmarkCheck, Wine as WineIcon, Camera, Star, Package } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Heart, Wine as WineIcon, Camera, Star, Package, Check } from 'lucide-react';
 import type { WineRecommendation, Wine } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 
@@ -21,6 +22,27 @@ export function WineCard({ recommendation, cardType = 'wine', onSave }: WineCard
   const { wine, explanation, is_saved, is_in_cellar, status, rating } = recommendation;
   const { isAuthenticated } = useAuth();
   const isCellar = cardType === 'cellar';
+
+  // Animation states
+  const [justSaved, setJustSaved] = useState(false);
+  const [showCheckmark, setShowCheckmark] = useState(false);
+
+  // Reset animation when is_saved changes
+  useEffect(() => {
+    if (is_saved && justSaved) {
+      setShowCheckmark(true);
+      const timer = setTimeout(() => {
+        setShowCheckmark(false);
+        setJustSaved(false);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [is_saved, justSaved]);
+
+  const handleSave = (wine: Wine) => {
+    setJustSaved(true);
+    onSave?.(wine);
+  };
 
   const getWineTypeColor = (type: string) => {
     switch (type) {
@@ -42,9 +64,9 @@ export function WineCard({ recommendation, cardType = 'wine', onSave }: WineCard
       case 'identified_wine':
         return 'Identified';
       case 'saved':
-        return 'Want to Try';
+        return 'Wishlist';
       case 'cellar':
-        return status === 'owned' ? 'Owned' : 'Tried';
+        return status === 'owned' ? 'Cellar' : 'Tried';
       default:
         return 'Recommendation';
     }
@@ -58,14 +80,20 @@ export function WineCard({ recommendation, cardType = 'wine', onSave }: WineCard
   };
 
   return (
-    <div className="bg-white/50 border border-wine-600/10 rounded-xl p-5 hover:shadow-lg transition-all group">
+    <div className={`bg-white/50 border border-wine-600/10 rounded-xl p-5 hover:shadow-lg transition-all group ${justSaved ? 'animate-card-saved' : ''}`}>
       <div className="flex gap-4">
         {/* Wine image placeholder */}
-        <div className="w-16 h-24 bg-cream rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+        <div className="w-16 h-24 bg-cream rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden relative">
           {isIdentified ? (
             <Camera className={`w-8 h-8 ${getWineTypeColor(wine.wine_type)}`} />
           ) : (
             <WineIcon className={`w-8 h-8 ${getWineTypeColor(wine.wine_type)}`} />
+          )}
+          {/* Success checkmark overlay */}
+          {showCheckmark && (
+            <div className="absolute inset-0 bg-green-500/90 flex items-center justify-center rounded-lg">
+              <Check className="w-8 h-8 text-white animate-save-pop" />
+            </div>
           )}
         </div>
 
@@ -75,7 +103,7 @@ export function WineCard({ recommendation, cardType = 'wine', onSave }: WineCard
             <span className={`font-mono text-[10px] uppercase tracking-wider ${isIdentified ? 'text-blue-600' : getStatusColor()}`}>
               {isCellar && status === 'owned' && <Package className="w-3 h-3 inline mr-1" />}
               {isCellar && status === 'tried' && <Star className="w-3 h-3 inline mr-1" />}
-              {cardType === 'saved' && <Bookmark className="w-3 h-3 inline mr-1" />}
+              {cardType === 'saved' && <Heart className="w-3 h-3 inline mr-1 fill-current" />}
               {getCardLabel()}
             </span>
           </div>
@@ -124,22 +152,19 @@ export function WineCard({ recommendation, cardType = 'wine', onSave }: WineCard
           )}
         </div>
 
-        {/* Save button */}
+        {/* Add to Wishlist button */}
         {isAuthenticated && onSave && !is_in_cellar && cardType !== 'saved' && (
           <button
-            onClick={() => onSave(wine)}
-            className={`self-start p-2 rounded-xl transition-colors ${
+            onClick={() => handleSave(wine)}
+            className={`self-start p-2 rounded-xl transition-all ${
               is_saved
-                ? 'bg-wine-100 text-wine-600'
-                : 'bg-gray-100 text-gray-400 hover:bg-wine-50 hover:text-wine-500'
-            }`}
-            title={is_saved ? 'Saved' : 'Save wine'}
+                ? 'bg-pink-100 text-pink-600'
+                : 'bg-gray-100 text-gray-400 hover:bg-pink-50 hover:text-pink-500'
+            } ${justSaved ? 'animate-save-pop' : ''}`}
+            title={is_saved ? 'In Wishlist' : 'Add to Wishlist'}
+            disabled={is_saved}
           >
-            {is_saved ? (
-              <BookmarkCheck className="w-5 h-5" />
-            ) : (
-              <Bookmark className="w-5 h-5" />
-            )}
+            <Heart className={`w-5 h-5 ${is_saved ? 'fill-current' : ''}`} />
           </button>
         )}
       </div>

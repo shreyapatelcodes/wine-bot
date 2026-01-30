@@ -277,6 +277,8 @@ export interface ChatMessage {
   cards?: ChatCard[];
   actions?: ChatAction[];
   intent?: IntentType;
+  // Example queries for cold start
+  exampleQueries?: string[];
 }
 
 // ============== API Response Types ==============

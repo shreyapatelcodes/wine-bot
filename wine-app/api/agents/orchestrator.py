@@ -6,9 +6,27 @@ Classifies user intent and routes to appropriate handlers.
 import json
 import re
 import uuid
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List, Tuple, Generator
 from openai import OpenAI
 from sqlalchemy.orm import Session
+
+# Pip's personality prompt - opinionated sommelier energy
+PIP_SYSTEM_PROMPT = """You are Pip, a fun and opinionated wine expert. Think of yourself as a knowledgeable friend who happens to be a sommelier - not a formal butler or a database.
+
+Style guidelines:
+- Be concise. Get to the point quickly. No long preambles.
+- Have opinions! Don't hedge everything. "This is great" beats "This could potentially be enjoyable".
+- Use casual, conversational language. Skip formal phrases like "I'd be happy to help".
+- Show enthusiasm naturally, but don't overdo it. One exclamation mark max per response.
+- When recommending wines, lead with WHY it's interesting, not just what it is.
+- Keep responses under 3 sentences unless the user explicitly asks for detail.
+- Never use emojis.
+
+Bad: "I'd be happy to help you find some wine recommendations. Based on your preferences for red wine under $30, I've found some excellent options that you might enjoy."
+Good: "Under $30 and red? This Cotes du Rhone punches way above its price - dark fruit, a little spice, and it'll make your Tuesday dinner feel fancy."
+
+Bad: "Here are some wines you might consider for your steak dinner."
+Good: "For steak, you want something with grip. A Malbec from Mendoza would be perfect here - bold enough to stand up to the meat without breaking the bank.\""""
 
 from config import Config
 from models.database import User, ChatSession, Wine, CellarBottle, SavedBottle
@@ -196,108 +214,9 @@ class ChatOrchestrator:
                     intent="rate"
                 )
 
-        # Check for recommendation preference gathering flow
-        # Refresh session to get latest context
-        self.db.refresh(session)
-        session_context = session.context or {}
-        gathering_prefs = session_context.get("gathering_recommendation_prefs")
-        if gathering_prefs:
-            # Create a copy to ensure SQLAlchemy detects changes
-            rec_prefs = dict(session_context.get("recommendation_prefs", {}))
-
-            # Check for budget responses
-            if any(word in message_lower for word in ["under 20", "under $20", "budget_under_20"]):
-                rec_prefs["price_max"] = 20
-            elif any(word in message_lower for word in ["20-40", "$20-40", "20 to 40", "budget_20_40"]):
-                rec_prefs["price_min"] = 20
-                rec_prefs["price_max"] = 40
-            elif any(word in message_lower for word in ["40+", "$40+", "over 40", "above 40", "budget_40_plus"]):
-                rec_prefs["price_min"] = 40
-            elif any(word in message_lower for word in ["no budget", "any budget", "doesn't matter", "budget_any"]):
-                pass  # No price constraint
-
-            # If we just got budget, ask about food pairing
-            if "food_pairing" not in rec_prefs and "asked_food" not in rec_prefs:
-                rec_prefs["asked_food"] = True
-                self.context_manager.update_session_context(session, {"recommendation_prefs": rec_prefs})
-
-                response_text = "Got it! **Are you pairing this with any food?** (or just tell me what you're eating)"
-                self.context_manager.add_message(session, "assistant", response_text)
-
-                return self._build_response(
-                    session=session,
-                    response=response_text,
-                    intent="recommend",
-                    actions=[
-                        {"type": "pairing_meat", "label": "Meat/Steak"},
-                        {"type": "pairing_fish", "label": "Fish/Seafood"},
-                        {"type": "pairing_pasta", "label": "Pasta"},
-                        {"type": "pairing_none", "label": "No pairing"},
-                    ]
-                )
-
-            # Check for food pairing responses
-            if "asked_food" in rec_prefs and "food_pairing" not in rec_prefs:
-                if any(word in message_lower for word in ["meat", "steak", "beef", "pairing_meat"]):
-                    rec_prefs["food_pairing"] = "steak"
-                elif any(word in message_lower for word in ["fish", "seafood", "pairing_fish"]):
-                    rec_prefs["food_pairing"] = "seafood"
-                elif any(word in message_lower for word in ["pasta", "italian", "pairing_pasta"]):
-                    rec_prefs["food_pairing"] = "pasta"
-                elif any(word in message_lower for word in ["no pairing", "no food", "just drinking", "pairing_none", "none"]):
-                    rec_prefs["food_pairing"] = None
-                else:
-                    # Use whatever they said as the pairing
-                    rec_prefs["food_pairing"] = message
-
-                # Ask about wine type preference
-                rec_prefs["asked_type"] = True
-                self.context_manager.update_session_context(session, {"recommendation_prefs": rec_prefs})
-
-                response_text = "Perfect! **Any preference for red, white, or something else?** (you can also say sparkling, natural, etc.)"
-                self.context_manager.add_message(session, "assistant", response_text)
-
-                return self._build_response(
-                    session=session,
-                    response=response_text,
-                    intent="recommend",
-                    actions=[
-                        {"type": "type_red", "label": "Red"},
-                        {"type": "type_white", "label": "White"},
-                        {"type": "type_rose", "label": "Rosé"},
-                        {"type": "type_any", "label": "Surprise me"},
-                    ]
-                )
-
-            # Check for wine type responses
-            if "asked_type" in rec_prefs:
-                if any(word in message_lower for word in ["red", "type_red"]):
-                    rec_prefs["wine_type"] = "red"
-                elif any(word in message_lower for word in ["white", "type_white"]):
-                    rec_prefs["wine_type"] = "white"
-                elif any(word in message_lower for word in ["rosé", "rose", "type_rose"]):
-                    rec_prefs["wine_type"] = "rosé"
-                elif any(word in message_lower for word in ["sparkling", "champagne", "bubbly"]):
-                    rec_prefs["wine_type"] = "sparkling"
-                elif any(word in message_lower for word in ["natural", "orange", "skin contact"]):
-                    rec_prefs["wine_type"] = "natural"
-                # "surprise me" or "any" means no type preference
-
-                # Done gathering - clear the flag and proceed with recommendations
-                self.context_manager.update_session_context(session, {
-                    "gathering_recommendation_prefs": None,
-                    "recommendation_prefs": rec_prefs
-                })
-
-                # Build description from gathered prefs
-                description_parts = []
-                if rec_prefs.get("wine_type"):
-                    description_parts.append(rec_prefs["wine_type"])
-                if rec_prefs.get("food_pairing"):
-                    description_parts.append(f"for {rec_prefs['food_pairing']}")
-                description = " ".join(description_parts) if description_parts else "wine recommendation"
-
-                return self._handle_recommend(session, description, rec_prefs)
+        # Removed: Old rigid multi-step preference gathering flow
+        # Now we just ask one natural question and let users say everything at once
+        # like "cheap red for steak" - the entity extraction handles parsing
 
         # Check for pending request clarification response
         if "recommend something new" in message_lower or "new" in message_lower and "recommend" in message_lower:
@@ -540,34 +459,24 @@ Current user message: {message}
             # Clear stored prefs after using them
             self.context_manager.update_session_context(session, {"recommendation_prefs": None})
 
-        # If request is too vague, ask clarifying questions
+        # Only ask clarifying questions for VERY generic requests (< 4 words with no useful info)
         is_vague = not has_price and not has_food and not has_type and not has_characteristics and not has_occasion
         message_lower = message.lower()
-        is_generic = any(phrase in message_lower for phrase in [
-            "find a wine", "find me a wine", "recommend", "help me find",
-            "suggest a wine", "wine recommendation", "what wine"
-        ]) and len(message.split()) < 8
+        is_very_generic = any(phrase in message_lower for phrase in [
+            "find a wine", "find me a wine", "recommend something", "help me find",
+            "suggest a wine", "wine recommendation"
+        ]) and len(message.split()) < 5
 
-        if is_vague and is_generic:
-            response_text = "I'd love to help you find the perfect wine! Let me ask a few questions:\n\n**What's your budget?**"
+        if is_vague and is_very_generic:
+            # More casual approach - just ask one natural question
+            response_text = "Sure! What are you in the mood for? Tell me anything - price range, what you're eating, red or white, whatever."
             self.context_manager.add_message(session, "assistant", response_text)
-
-            # Store that we're in recommendation gathering mode
-            self.context_manager.update_session_context(session, {
-                "gathering_recommendation_prefs": True,
-                "recommendation_prefs": {}
-            })
 
             return self._build_response(
                 session=session,
                 response=response_text,
                 intent="recommend",
-                actions=[
-                    {"type": "budget_under_20", "label": "Under $20"},
-                    {"type": "budget_20_40", "label": "$20-40"},
-                    {"type": "budget_40_plus", "label": "$40+"},
-                    {"type": "budget_any", "label": "No budget"},
-                ]
+                requires_clarification=True
             )
 
         # Import here to avoid circular imports
@@ -840,25 +749,8 @@ Current user message: {message}
 
         # If no recent reference, try to find the wine by searching the message
         if not wine:
-            # Search for wines matching words in the message
-            # Look for wines where the name appears in the message
-            all_wines = self.db.query(Wine).all()
-            message_lower = message.lower()
-
-            best_match = None
-            best_score = 0
-
-            for w in all_wines:
-                wine_name_lower = w.name.lower()
-                # Check if significant parts of the wine name appear in the message
-                name_words = [word for word in wine_name_lower.split() if len(word) > 3]
-                if name_words:
-                    matches = sum(1 for word in name_words if word in message_lower)
-                    score = matches / len(name_words)
-                    if score > best_score and score >= 0.5:  # At least 50% of words match
-                        best_score = score
-                        best_match = w
-
+            # Use efficient database search instead of loading all wines
+            best_match = self._search_wine_by_name(message)
             if best_match:
                 wine = best_match
                 wine_ref = {"wine_id": wine.id, "wine_name": wine.name}
@@ -1104,17 +996,8 @@ Provide helpful information about this wine. Be conversational and informative."
 
         # Also search all wines in database if no saved match
         if not best_match_wine:
-            all_wines = self.db.query(Wine).all()
-            for wine in all_wines:
-                name_lower = wine.name.lower()
-                name_clean = re.sub(r"['\"\-]", " ", name_lower)
-                name_words = [w for w in name_clean.split() if len(w) > 2]
-                if name_words:
-                    matches = sum(1 for word in name_words if word in search_text)
-                    match_score = matches / len(name_words)
-                    if match_score >= 0.5 and matches > best_match_score:
-                        best_match_score = matches
-                        best_match_wine = wine
+            # Use efficient database search instead of loading all wines
+            best_match_wine = self._search_wine_by_name(search_text)
 
         if best_match_wine:
             wine_ref = {
@@ -1357,20 +1240,18 @@ Provide helpful information about this wine. Be conversational and informative."
         wine_name = None
         wine_id = None
 
-        # Get all bottles in cellar to match against
-        all_bottles = self.db.query(CellarBottle).filter(
-            CellarBottle.user_id == self.user.id
-        ).all()
-
-        # Also get all wines from the database
-        all_wines = self.db.query(Wine).all()
-
         # Build search text from recent history
         search_text = message.lower()
         for msg in history[-4:]:  # Check last 4 messages
             search_text += " " + msg.get("content", "").lower()
         # Clean up special characters for better matching
         search_text = re.sub(r"['\"\-]", " ", search_text)
+
+        # Get cellar bottles with eager-loaded wine relationship for matching
+        # Only fetch limited set to avoid memory issues
+        all_bottles = self.db.query(CellarBottle).filter(
+            CellarBottle.user_id == self.user.id
+        ).limit(100).all()
 
         # Try to match against cellar bottles first - find BEST match, not first
         best_match_score = 0
@@ -1397,20 +1278,12 @@ Provide helpful information about this wine. Be conversational and informative."
             cellar_bottle = best_match_bottle
             wine_name = best_match_name
 
-        # If no cellar match, try to match against all wines in database
+        # If no cellar match, use efficient database search
         if not cellar_bottle:
-            best_match_score = 0
-            for w in all_wines:
-                name_lower = w.name.lower()
-                name_clean = re.sub(r"['\"\-]", " ", name_lower)
-                name_words = [word for word in name_clean.split() if len(word) > 2]
-                if name_words:
-                    matches = sum(1 for word in name_words if word in search_text)
-                    match_score = matches / len(name_words)
-                    if match_score >= 0.4 and matches > best_match_score:
-                        best_match_score = matches
-                        wine_id = w.id
-                        wine_name = w.name
+            best_match = self._search_wine_by_name(search_text)
+            if best_match:
+                wine_id = best_match.id
+                wine_name = best_match.name
 
         # Fall back to recent wine from session context first
         if not cellar_bottle and not wine_id:
@@ -1903,16 +1776,36 @@ What would you like to do?"""
             response = self.client.chat.completions.create(
                 model=Config.OPENAI_CHAT_MODEL,
                 messages=[
-                    {"role": "system", "content": "You are Pip, a friendly and knowledgeable wine mentor."},
+                    {"role": "system", "content": PIP_SYSTEM_PROMPT},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
-                max_tokens=500
+                max_tokens=300
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
             print(f"Response generation error: {e}", flush=True)
             return "I'm having trouble responding right now. Please try again."
+
+    def _generate_response_stream(self, prompt: str):
+        """Generate a streaming response using the LLM. Yields text chunks."""
+        try:
+            stream = self.client.chat.completions.create(
+                model=Config.OPENAI_CHAT_MODEL,
+                messages=[
+                    {"role": "system", "content": PIP_SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=300,
+                stream=True
+            )
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        except Exception as e:
+            print(f"Stream generation error: {e}", flush=True)
+            yield "I'm having trouble responding right now. Please try again."
 
     def _parse_json(self, text: str) -> Dict[str, Any]:
         """Parse JSON from LLM response, handling markdown code blocks."""
@@ -1949,21 +1842,79 @@ What would you like to do?"""
 
         return None
 
+    def _search_wine_by_name(self, search_text: str, limit: int = 20) -> Optional[Wine]:
+        """
+        Search for a wine by name using efficient database queries.
+        Returns the best matching wine or None.
+        """
+        search_text_clean = re.sub(r"['\"\-]", " ", search_text.lower())
+        search_words = [w for w in search_text_clean.split() if len(w) > 2]
+
+        if not search_words:
+            return None
+
+        # Build a query using ILIKE for each significant word
+        # Start with wines that match the most words
+        from sqlalchemy import or_, func
+
+        # Try to find wines where name contains key search words
+        # Use first 3 most significant words for initial filter
+        key_words = search_words[:3]
+
+        filters = []
+        for word in key_words:
+            filters.append(Wine.name.ilike(f"%{word}%"))
+
+        if not filters:
+            return None
+
+        # Get candidate wines (limit to avoid memory issues)
+        candidates = self.db.query(Wine).filter(
+            or_(*filters)
+        ).limit(limit).all()
+
+        if not candidates:
+            return None
+
+        # Score candidates by word match ratio
+        best_match = None
+        best_score = 0
+
+        for wine in candidates:
+            name_lower = wine.name.lower()
+            name_clean = re.sub(r"['\"\-]", " ", name_lower)
+            name_words = [w for w in name_clean.split() if len(w) > 2]
+
+            if not name_words:
+                continue
+
+            # Count how many of the wine's name words appear in search text
+            matches = sum(1 for word in name_words if word in search_text_clean)
+            score = matches / len(name_words)
+
+            if score > best_score and score >= 0.4:
+                best_score = score
+                best_match = wine
+
+        return best_match
+
     def _get_user_wine_ids(self) -> Tuple[set, set]:
         """Get sets of wine IDs in user's saved and cellar."""
         saved_ids = set()
         cellar_ids = set()
 
         if self.user:
-            saved_bottles = self.db.query(SavedBottle).filter(
+            # Only fetch wine_id column instead of full records
+            saved_wine_ids = self.db.query(SavedBottle.wine_id).filter(
                 SavedBottle.user_id == self.user.id
             ).all()
-            saved_ids = {sb.wine_id for sb in saved_bottles}
+            saved_ids = {row[0] for row in saved_wine_ids}
 
-            cellar_bottles = self.db.query(CellarBottle).filter(
-                CellarBottle.user_id == self.user.id
+            cellar_wine_ids = self.db.query(CellarBottle.wine_id).filter(
+                CellarBottle.user_id == self.user.id,
+                CellarBottle.wine_id.isnot(None)
             ).all()
-            cellar_ids = {cb.wine_id for cb in cellar_bottles if cb.wine_id}
+            cellar_ids = {row[0] for row in cellar_wine_ids}
 
         return saved_ids, cellar_ids
 

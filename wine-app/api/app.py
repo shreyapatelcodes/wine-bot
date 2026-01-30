@@ -7,8 +7,7 @@ import base64
 import json
 import re
 from datetime import timedelta
-from pathlib import Path
-from flask import Flask, jsonify, request, g
+from flask import Flask, jsonify, request, g, Response
 from flask_cors import CORS
 from flask_jwt_extended import (
     get_jwt_identity,
@@ -46,45 +45,18 @@ from models.schemas import (
     ChatAction,
 )
 
-# Wine recommender path for lazy loading
-_wine_recommender_path = Path(__file__).parent.parent.parent / "wine-recommender"
+# Wine recommender - now using local module
 _recommender_engine = None
 _recommender_prefs_class = None
 
 
 def _get_recommender():
-    """Lazy load the wine recommender to avoid module conflicts."""
+    """Get the wine recommender engine and UserPreferences class."""
     global _recommender_engine, _recommender_prefs_class
     if _recommender_engine is None:
-        import importlib.util
-
-        # Save current modules that might conflict
-        saved_modules = {}
-        conflicting_prefixes = ['models', 'config', 'agents', 'utils']
-        for mod_name in list(sys.modules.keys()):
-            for prefix in conflicting_prefixes:
-                if mod_name == prefix or mod_name.startswith(prefix + '.'):
-                    saved_modules[mod_name] = sys.modules.pop(mod_name)
-                    break
-
-        # Add wine-recommender to path
-        sys.path.insert(0, str(_wine_recommender_path))
-
-        try:
-            # Load wine-recommender's modules fresh
-            from agents.orchestrator import get_wine_recommendations
-            from models.schemas import UserPreferences
-            _recommender_engine = get_wine_recommendations
-            _recommender_prefs_class = UserPreferences
-        finally:
-            # Remove wine-recommender from path
-            if str(_wine_recommender_path) in sys.path:
-                sys.path.remove(str(_wine_recommender_path))
-
-            # Restore wine-app's modules
-            for mod_name, mod in saved_modules.items():
-                sys.modules[mod_name] = mod
-
+        from agents.wine_recommender import get_wine_recommendations, UserPreferences
+        _recommender_engine = get_wine_recommendations
+        _recommender_prefs_class = UserPreferences
     return _recommender_engine, _recommender_prefs_class
 
 
@@ -690,20 +662,22 @@ def create_app():
         except Exception as e:
             return jsonify({"error": f"Recommendation engine error: {str(e)}"}), 500
 
-        # Get user's saved/cellar wine IDs for status flags
+        # Get user's saved/cellar wine IDs for status flags (fetch only IDs, not full records)
         saved_wine_ids = set()
         cellar_wine_ids = set()
         user = getattr(g, 'current_user', None)
         if user:
             db = g.db
             saved_wine_ids = {
-                sb.wine_id for sb in
-                db.query(SavedBottle).filter(SavedBottle.user_id == user.id).all()
+                row[0] for row in
+                db.query(SavedBottle.wine_id).filter(SavedBottle.user_id == user.id).all()
             }
             cellar_wine_ids = {
-                cb.wine_id for cb in
-                db.query(CellarBottle).filter(CellarBottle.user_id == user.id).all()
-                if cb.wine_id
+                row[0] for row in
+                db.query(CellarBottle.wine_id).filter(
+                    CellarBottle.user_id == user.id,
+                    CellarBottle.wine_id.isnot(None)
+                ).all()
             }
 
         # Map recommendations to response format
@@ -796,6 +770,77 @@ def create_app():
         )
 
         return jsonify(response.model_dump(mode="json"))
+
+    # ============== Streaming Chat Endpoint ==============
+
+    @app.route("/api/v1/chat/stream", methods=["POST"])
+    @jwt_optional
+    def chat_stream():
+        """
+        Streaming chat endpoint for Pip wine assistant.
+        Returns Server-Sent Events (SSE) for real-time response streaming.
+        """
+        try:
+            data = ChatRequest(**request.json)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 400
+
+        from agents.orchestrator import ChatOrchestrator
+
+        user = getattr(g, 'current_user', None)
+        db = g.db
+
+        orchestrator = ChatOrchestrator(db=db, user=user)
+
+        def generate():
+            try:
+                # Process the message (this does intent classification, entity extraction, etc.)
+                result = orchestrator.process_message(
+                    message=data.message,
+                    session_id=data.session_id,
+                    image_base64=data.image_base64,
+                    history=data.history
+                )
+
+                # Send metadata first
+                metadata = {
+                    "type": "metadata",
+                    "intent": result["intent"],
+                    "session_id": result["session_id"],
+                    "cards": result.get("cards", []),
+                    "actions": result.get("actions", []),
+                    "requires_auth": result.get("requires_auth", False),
+                    "requires_clarification": result.get("requires_clarification", False),
+                    "confirmation_required": result.get("confirmation_required", False),
+                }
+                yield f"data: {json.dumps(metadata)}\n\n"
+
+                # Stream the response text in chunks
+                response_text = result["response"]
+                # Send response in small chunks to simulate streaming
+                # In production, this would use the actual LLM streaming
+                chunk_size = 15  # characters per chunk
+                for i in range(0, len(response_text), chunk_size):
+                    chunk = response_text[i:i + chunk_size]
+                    yield f"data: {json.dumps({'type': 'text', 'content': chunk})}\n\n"
+
+                # Send completion signal
+                yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+            except Exception as e:
+                print(f"Streaming chat error: {e}")
+                error_msg = {"type": "error", "error": str(e)}
+                yield f"data: {json.dumps(error_msg)}\n\n"
+
+        return Response(
+            generate(),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'X-Accel-Buffering': 'no',
+            }
+        )
 
     # ============== Vision Endpoints ==============
 

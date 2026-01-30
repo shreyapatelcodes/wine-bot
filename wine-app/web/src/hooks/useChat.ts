@@ -42,24 +42,32 @@ function generateId(): string {
 }
 
 function createWelcomeMessage(isAuthenticated: boolean): ChatMessage {
+  // Keep action chips minimal - don't overwhelm
   const baseActions: ChatAction[] = [
     { type: 'recommend', label: 'Find a wine' },
-    { type: 'educate', label: 'Learn about wine' },
     { type: 'photo', label: 'Scan a label' },
   ];
 
   const authActions: ChatAction[] = [
-    { type: 'cellar', label: 'My Cellar' },
-    { type: 'tried', label: 'Tried' },
-    { type: 'want_to_try', label: 'Want to Try' },
+    { type: 'cellar', label: 'My cellar' },
+  ];
+
+  // Example queries to help users get started
+  const exampleQueries = [
+    "cheap red for taco night",
+    "birthday gift under $50",
+    "what's the deal with natural wine?",
   ];
 
   return {
     id: 'welcome',
     role: 'assistant',
-    content: "Hey! I'm Pip, your wine guide. I can help you discover wines, answer questions, manage your collection, or identify bottles from photos. What are you in the mood for?",
+    content: isAuthenticated
+      ? "Hey, good to see you! What are we drinking tonight?"
+      : "Hey! I'm Pip. Looking for something to drink, or just curious about wine?",
     timestamp: new Date().toISOString(),
     actions: isAuthenticated ? [...baseActions, ...authActions] : baseActions,
+    exampleQueries,
   };
 }
 
